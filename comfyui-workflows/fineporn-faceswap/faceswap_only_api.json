@@ -1,0 +1,564 @@
+{
+  "12": {
+    "class_type": "VAELoader",
+    "inputs": {
+      "vae_name": "qwen_image_vae.safetensors"
+    },
+    "_meta": {
+      "title": "VAE (shared: Krea 2 + Qwen Edit)"
+    }
+  },
+  "30": {
+    "class_type": "UltralyticsDetectorProvider",
+    "inputs": {
+      "model_name": "bbox/face_yolov8m.pt"
+    },
+    "_meta": {
+      "title": "Face detector"
+    }
+  },
+  "17": {
+    "class_type": "LoadImage",
+    "inputs": {
+      "image": "target.png"
+    },
+    "_meta": {
+      "title": "Target image (body to keep)"
+    }
+  },
+  "20": {
+    "class_type": "LoadImage",
+    "inputs": {
+      "image": "creator_reference.png"
+    },
+    "_meta": {
+      "title": "Creator reference photo"
+    }
+  },
+  "21": {
+    "class_type": "BboxDetectorSEGS",
+    "inputs": {
+      "bbox_detector": [
+        "30",
+        0
+      ],
+      "image": [
+        "20",
+        0
+      ],
+      "threshold": 0.5,
+      "dilation": 0,
+      "crop_factor": 3.0,
+      "drop_size": 10,
+      "labels": "all"
+    },
+    "_meta": {
+      "title": "Detect faces"
+    }
+  },
+  "22": {
+    "class_type": "ImpactSEGSOrderedFilter",
+    "inputs": {
+      "segs": [
+        "21",
+        0
+      ],
+      "target": "area(=w*h)",
+      "order": true,
+      "take_start": 0,
+      "take_count": 1
+    },
+    "_meta": {
+      "title": "Keep largest face"
+    }
+  },
+  "23": {
+    "class_type": "SegsToCombinedMask",
+    "inputs": {
+      "segs": [
+        "22",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "Face mask"
+    }
+  },
+  "24": {
+    "class_type": "InpaintCropImproved",
+    "inputs": {
+      "image": [
+        "20",
+        0
+      ],
+      "mask": [
+        "23",
+        0
+      ],
+      "downscale_algorithm": "bilinear",
+      "upscale_algorithm": "bicubic",
+      "preresize": false,
+      "preresize_mode": "ensure minimum resolution",
+      "preresize_min_width": 1024,
+      "preresize_min_height": 1024,
+      "preresize_max_width": 16384,
+      "preresize_max_height": 16384,
+      "mask_fill_holes": true,
+      "mask_expand_pixels": 0,
+      "mask_invert": false,
+      "mask_blend_pixels": 0,
+      "mask_hipass_filter": 0.1,
+      "extend_for_outpainting": false,
+      "extend_up_factor": 1.0,
+      "extend_down_factor": 1.0,
+      "extend_left_factor": 1.0,
+      "extend_right_factor": 1.0,
+      "context_from_mask_extend_factor": 1.8,
+      "output_resize_to_target_size": true,
+      "output_target_width": 1024,
+      "output_target_height": 1024,
+      "output_padding": "32",
+      "device_mode": "gpu (much faster)"
+    },
+    "_meta": {
+      "title": "Crop reference head"
+    }
+  },
+  "25": {
+    "class_type": "PreviewImage",
+    "inputs": {
+      "images": [
+        "24",
+        1
+      ]
+    },
+    "_meta": {
+      "title": "Reference crop (Picture 2)"
+    }
+  },
+  "31": {
+    "class_type": "BboxDetectorSEGS",
+    "inputs": {
+      "bbox_detector": [
+        "30",
+        0
+      ],
+      "image": [
+        "17",
+        0
+      ],
+      "threshold": 0.5,
+      "dilation": 0,
+      "crop_factor": 3.0,
+      "drop_size": 10,
+      "labels": "all"
+    },
+    "_meta": {
+      "title": "Detect faces"
+    }
+  },
+  "32": {
+    "class_type": "ImpactSEGSOrderedFilter",
+    "inputs": {
+      "segs": [
+        "31",
+        0
+      ],
+      "target": "area(=w*h)",
+      "order": true,
+      "take_start": 0,
+      "take_count": 1
+    },
+    "_meta": {
+      "title": "Keep largest face"
+    }
+  },
+  "33": {
+    "class_type": "SegsToCombinedMask",
+    "inputs": {
+      "segs": [
+        "32",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "Face mask"
+    }
+  },
+  "34": {
+    "class_type": "ImpactDecomposeSEGS",
+    "inputs": {
+      "segs": [
+        "32",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "Face box"
+    }
+  },
+  "35": {
+    "class_type": "ImpactFrom_SEG_ELT",
+    "inputs": {
+      "seg_elt": [
+        "34",
+        1
+      ]
+    },
+    "_meta": {
+      "title": "Face box"
+    }
+  },
+  "36": {
+    "class_type": "ImpactFrom_SEG_ELT_bbox",
+    "inputs": {
+      "bbox": [
+        "35",
+        4
+      ]
+    },
+    "_meta": {
+      "title": "Face box coords"
+    }
+  },
+  "37": {
+    "class_type": "ComfyMathExpression",
+    "inputs": {
+      "expression": "round(max(c - a, d - b) * 0.30)",
+      "values.a": [
+        "36",
+        0
+      ],
+      "values.b": [
+        "36",
+        1
+      ],
+      "values.c": [
+        "36",
+        2
+      ],
+      "values.d": [
+        "36",
+        3
+      ]
+    },
+    "_meta": {
+      "title": "Head mask grow (px) = 30% of face size"
+    }
+  },
+  "38": {
+    "class_type": "InpaintCropImproved",
+    "inputs": {
+      "image": [
+        "17",
+        0
+      ],
+      "mask": [
+        "33",
+        0
+      ],
+      "downscale_algorithm": "bilinear",
+      "upscale_algorithm": "bicubic",
+      "preresize": false,
+      "preresize_mode": "ensure minimum resolution",
+      "preresize_min_width": 1024,
+      "preresize_min_height": 1024,
+      "preresize_max_width": 16384,
+      "preresize_max_height": 16384,
+      "mask_fill_holes": true,
+      "mask_expand_pixels": [
+        "37",
+        1
+      ],
+      "mask_invert": false,
+      "mask_blend_pixels": 32,
+      "mask_hipass_filter": 0.1,
+      "extend_for_outpainting": false,
+      "extend_up_factor": 1.0,
+      "extend_down_factor": 1.0,
+      "extend_left_factor": 1.0,
+      "extend_right_factor": 1.0,
+      "context_from_mask_extend_factor": 1.6,
+      "output_resize_to_target_size": true,
+      "output_target_width": 1024,
+      "output_target_height": 1024,
+      "output_padding": "32",
+      "device_mode": "gpu (much faster)"
+    },
+    "_meta": {
+      "title": "Crop target head"
+    }
+  },
+  "39": {
+    "class_type": "PreviewImage",
+    "inputs": {
+      "images": [
+        "38",
+        1
+      ]
+    },
+    "_meta": {
+      "title": "Target crop (Picture 1)"
+    }
+  },
+  "40": {
+    "class_type": "UNETLoader",
+    "inputs": {
+      "unet_name": "qwen_image_edit_2511_fp8mixed.safetensors",
+      "weight_dtype": "default"
+    },
+    "_meta": {
+      "title": "Qwen-Image-Edit-2511"
+    }
+  },
+  "41": {
+    "class_type": "LoraLoaderModelOnly",
+    "inputs": {
+      "model": [
+        "40",
+        0
+      ],
+      "lora_name": "Qwen-Image-Edit-2511-Lightning-4steps-V1.0-bf16.safetensors",
+      "strength_model": 1.0
+    },
+    "_meta": {
+      "title": "Lightning 4-step LoRA"
+    }
+  },
+  "42": {
+    "class_type": "LoraLoaderModelOnly",
+    "inputs": {
+      "model": [
+        "41",
+        0
+      ],
+      "lora_name": "bfs_head_v5_2511_merged_version_rank_16_fp16.safetensors",
+      "strength_model": 1.0
+    },
+    "_meta": {
+      "title": "BFS head swap V5 LoRA"
+    }
+  },
+  "43": {
+    "class_type": "ModelSamplingAuraFlow",
+    "inputs": {
+      "model": [
+        "42",
+        0
+      ],
+      "shift": 3.1,
+      "sampling": "flow"
+    },
+    "_meta": {
+      "title": "Shift"
+    }
+  },
+  "44": {
+    "class_type": "CFGNorm",
+    "inputs": {
+      "model": [
+        "43",
+        0
+      ],
+      "strength": 1.0,
+      "pre_cfg": false
+    },
+    "_meta": {
+      "title": "CFG norm"
+    }
+  },
+  "45": {
+    "class_type": "CLIPLoader",
+    "inputs": {
+      "clip_name": "qwen_2.5_vl_7b_fp8_scaled.safetensors",
+      "type": "qwen_image",
+      "device": "default"
+    },
+    "_meta": {
+      "title": "Qwen 2.5 VL 7B text encoder"
+    }
+  },
+  "46": {
+    "class_type": "TextEncodeQwenImageEditPlus",
+    "inputs": {
+      "clip": [
+        "45",
+        0
+      ],
+      "prompt": "head_swap: start with Picture 1 as the base image, keeping its lighting, environment, and background. remove the head from Picture 1 completely and replace it with the head from Picture 2, strictly preserving the hair, eye color, and nose structure of Picture 2. copy the eye direction, head rotation, and micro-expressions from Picture 1.",
+      "vae": [
+        "12",
+        0
+      ],
+      "image1": [
+        "38",
+        1
+      ],
+      "image2": [
+        "24",
+        1
+      ]
+    },
+    "_meta": {
+      "title": "Swap instruction (Picture 1 = target, Picture 2 = creator)"
+    }
+  },
+  "47": {
+    "class_type": "FluxKontextMultiReferenceLatentMethod",
+    "inputs": {
+      "conditioning": [
+        "46",
+        0
+      ],
+      "reference_latents_method": "index_timestep_zero"
+    },
+    "_meta": {
+      "title": "Reference method"
+    }
+  },
+  "48": {
+    "class_type": "TextEncodeQwenImageEditPlus",
+    "inputs": {
+      "clip": [
+        "45",
+        0
+      ],
+      "prompt": "",
+      "vae": [
+        "12",
+        0
+      ],
+      "image1": [
+        "38",
+        1
+      ],
+      "image2": [
+        "24",
+        1
+      ]
+    },
+    "_meta": {
+      "title": "Negative (ignored at CFG 1)"
+    }
+  },
+  "49": {
+    "class_type": "FluxKontextMultiReferenceLatentMethod",
+    "inputs": {
+      "conditioning": [
+        "48",
+        0
+      ],
+      "reference_latents_method": "index_timestep_zero"
+    },
+    "_meta": {
+      "title": "Reference method"
+    }
+  },
+  "50": {
+    "class_type": "VAEEncode",
+    "inputs": {
+      "pixels": [
+        "38",
+        1
+      ],
+      "vae": [
+        "12",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "Encode target crop"
+    }
+  },
+  "51": {
+    "class_type": "SetLatentNoiseMask",
+    "inputs": {
+      "samples": [
+        "50",
+        0
+      ],
+      "mask": [
+        "38",
+        2
+      ]
+    },
+    "_meta": {
+      "title": "Only repaint the head"
+    }
+  },
+  "52": {
+    "class_type": "KSampler",
+    "inputs": {
+      "model": [
+        "44",
+        0
+      ],
+      "seed": 0,
+      "steps": 4,
+      "cfg": 1.0,
+      "sampler_name": "euler",
+      "scheduler": "simple",
+      "positive": [
+        "47",
+        0
+      ],
+      "negative": [
+        "49",
+        0
+      ],
+      "latent_image": [
+        "51",
+        0
+      ],
+      "denoise": 1.0
+    },
+    "_meta": {
+      "title": "Swap (4 steps / CFG 1)"
+    }
+  },
+  "53": {
+    "class_type": "VAEDecode",
+    "inputs": {
+      "samples": [
+        "52",
+        0
+      ],
+      "vae": [
+        "12",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "Decode swap"
+    }
+  },
+  "54": {
+    "class_type": "InpaintStitchImproved",
+    "inputs": {
+      "stitcher": [
+        "38",
+        0
+      ],
+      "inpainted_image": [
+        "53",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "Paste head back"
+    }
+  },
+  "55": {
+    "class_type": "SaveImage",
+    "inputs": {
+      "images": [
+        "54",
+        0
+      ],
+      "filename_prefix": "faceswap/swap"
+    },
+    "_meta": {
+      "title": "Save: swap"
+    }
+  }
+}
