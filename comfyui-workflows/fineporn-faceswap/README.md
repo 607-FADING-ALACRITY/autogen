@@ -95,6 +95,8 @@ Notes on the files:
 
 For `faceswap_only.json`, load the target image in group 1 instead of writing a prompt. Output: `faceswap/swap_*`.
 
+To finish either output with portrait blur, a LUT grade, grain and a metadata-clean JPEG, run it through [`../postprocess`](../postprocess/README.md).
+
 ## How it works
 
 - **Detection.** `face_yolov8m` finds faces. If there are several people, only the largest face is swapped.
@@ -154,8 +156,8 @@ The workflows are generated, not hand-edited. Change settings in `tools/build_wo
 cd tools
 python build_workflows.py                        # writes the *_api.json files and the layout specs
 # with ComfyUI + the three node packs running on :8188, and `npm i playwright`:
-node to_ui.mjs fineporn_faceswap.spec.json ../fineporn_faceswap.json
-node to_ui.mjs faceswap_only.spec.json ../faceswap_only.json
+node ../../tools/to_ui.mjs fineporn_faceswap.spec.json ../fineporn_faceswap.json
+node ../../tools/to_ui.mjs faceswap_only.spec.json ../faceswap_only.json
 ```
 
-`to_ui.mjs` builds the drag-and-drop file inside the real ComfyUI frontend. It refuses to write it unless the result converts back to an identical API graph.
+`comfyui-workflows/tools/to_ui.mjs` builds the drag-and-drop file inside the real ComfyUI frontend. It refuses to write it unless the result converts back to an identical API graph.

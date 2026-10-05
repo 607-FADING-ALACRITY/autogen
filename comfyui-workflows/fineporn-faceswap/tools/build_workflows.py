@@ -3,12 +3,12 @@
 Writes:
   ../fineporn_faceswap_api.json   generate with FinePorn v5 -> head swap -> FinePorn texture pass (API format)
   ../faceswap_only_api.json       head swap onto an existing image                                (API format)
-  ./*.spec.json                   API prompt + layout; to_ui.mjs turns these into the drag-and-drop UI files
+  ./*.spec.json                   API prompt + layout; ../../tools/to_ui.mjs turns these into the drag-and-drop UI files
 
 Run:  python build_workflows.py
 Then, with ComfyUI + the three custom node packs running on :8188:
-      node to_ui.mjs fineporn_faceswap.spec.json ../fineporn_faceswap.json
-      node to_ui.mjs faceswap_only.spec.json ../faceswap_only.json
+      node ../../tools/to_ui.mjs fineporn_faceswap.spec.json ../fineporn_faceswap.json
+      node ../../tools/to_ui.mjs faceswap_only.spec.json ../faceswap_only.json
 """
 
 import json
