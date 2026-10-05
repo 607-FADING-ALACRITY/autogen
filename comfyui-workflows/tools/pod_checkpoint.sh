@@ -44,6 +44,7 @@ ok()   { printf '   ok    %s\n' "$1"; }
 warn() { printf '   WARN  %s\n' "$1"; WARNINGS+=("$1"); }
 block(){ printf '   STOP  %s\n' "$1"; BLOCKERS+=("$1"); }
 human(){ numfmt --to=iec --suffix=B "$1" 2>/dev/null || echo "${1}B"; }
+own_git_repo() { [ "$(git -C "$1" rev-parse --show-toplevel 2>/dev/null)" = "$(realpath -m "$1")" ]; }
 under_workspace() { case "$(realpath -m "$1")" in "$WS_REAL"/*|"$WS_REAL") return 0;; *) return 1;; esac; }
 
 if [ ! -d "$COMFY_DIR" ]; then
@@ -70,7 +71,7 @@ else
   [ "$(stat -L -c %d "$WS_REAL")" != "$(stat -L -c %d /)" ] && PERSISTENT=yes || PERSISTENT=no
 fi
 if [ "$PERSISTENT" = yes ]; then
-  ok "$WORKSPACE is its own volume. Stop keeps it."
+  ok "$WORKSPACE is its own volume. Stop keeps it; Terminate deletes it unless it's a network volume."
 else
   printf '   STOP  %s\n' "$WORKSPACE is on the container disk, not a volume: this pod has no volume disk, so Stop deletes EVERYTHING on it."
 fi
@@ -195,7 +196,7 @@ step 3/5 "Writing $RESUME"
   echo "## Tomorrow"
   echo
   if [ "$PERSISTENT" = yes ]; then
-    echo '1. RunPod console → this pod → **Start**. Never **Terminate**: that deletes the volume.'
+    echo '1. RunPod console → this pod → **Start**. On a network volume you can instead deploy a new pod on the same volume; otherwise never **Terminate**, it deletes the volume.'
     echo "2. The template start script relaunches ComfyUI from the volume. Give it a few minutes, then open port $PORT."
     echo '3. If ComfyUI does not come up, paste the launch command below into the web terminal.'
     echo '4. If RunPod says the machine has no free GPU, start it with 0 GPUs to reach your files, or set up a new pod from the backup tar.'
@@ -222,7 +223,8 @@ step 3/5 "Writing $RESUME"
   for d in "$COMFY_DIR"/custom_nodes/*/; do
     [ -d "$d" ] || continue
     n=$(basename "$d")
-    if git -C "$d" rev-parse --git-dir >/dev/null 2>&1; then
+    [ "$n" = __pycache__ ] && continue
+    if own_git_repo "$d"; then
       url=$(git -C "$d" config --get remote.origin.url 2>/dev/null || echo "no remote")
       rev=$(git -C "$d" rev-parse --short HEAD 2>/dev/null || echo "?")
       dirty=$(git -C "$d" status --porcelain 2>/dev/null | head -1)
@@ -275,7 +277,8 @@ if [ -d user/default/workflows ]; then PACK+=("user/default/workflows"); ok "sav
 for d in custom_nodes/*/; do
   d=${d%/}
   [ -d "$d" ] || continue
-  git -C "$d" rev-parse --git-dir >/dev/null 2>&1 && continue
+  [ "$(basename "$d")" = __pycache__ ] && continue
+  own_git_repo "$d" && continue
   sz=$(du -sb "$d" 2>/dev/null | cut -f1)
   if [ "${sz:-0}" -lt $((50 * 1024 * 1024)) ]; then PACK+=("$d"); ok "custom node not on git: $d"
   else warn "custom node $d isn't a git repo and is $(human "$sz"); left out of the tar."; fi
@@ -355,7 +358,7 @@ elif [ ${#BLOCKERS[@]} -gt 0 ]; then
   echo "   >>> NOT SAFE TO STOP YET. Fix these first, then rerun:"
   printf '    - %s\n' "${BLOCKERS[@]}"
 else
-  echo "   >>> SAFE TO STOP. Use Stop, never Terminate."
+  echo "   >>> SAFE TO STOP. Terminate only if $WORKSPACE is a network volume."
 fi
 if [ ${#LINKS[@]} -gt 0 ]; then
   echo
