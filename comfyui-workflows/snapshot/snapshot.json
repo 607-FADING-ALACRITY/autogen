@@ -1,8 +1,8 @@
 {
-  "id": "2e8e3b3a-70d5-4905-83c0-b268809736f7",
+  "id": "5743c3f5-520b-4714-9481-21106d9fc5c5",
   "revision": 0,
-  "last_node_id": 17,
-  "last_link_id": 22,
+  "last_node_id": 18,
+  "last_link_id": 32,
   "nodes": [
     {
       "id": 1,
@@ -44,7 +44,8 @@
           "name": "MODEL",
           "type": "MODEL",
           "links": [
-            12
+            17,
+            19
           ]
         }
       ],
@@ -66,7 +67,7 @@
       "type": "LoraLoaderModelOnly",
       "pos": [
         734,
-        222
+        358
       ],
       "size": [
         340,
@@ -80,7 +81,7 @@
           "localized_name": "model",
           "name": "model",
           "type": "MODEL",
-          "link": 12
+          "link": 17
         },
         {
           "localized_name": "lora_name",
@@ -107,11 +108,11 @@
           "name": "MODEL",
           "type": "MODEL",
           "links": [
-            13
+            18
           ]
         }
       ],
-      "title": "Character LoRA",
+      "title": "Character LoRA, likeness steps (3–10)",
       "properties": {
         "Node name for S&R": "LoraLoaderModelOnly"
       },
@@ -129,21 +130,21 @@
       "type": "LoraLoaderModelOnly",
       "pos": [
         734,
-        358
+        494
       ],
       "size": [
         340,
         82
       ],
       "flags": {},
-      "order": 8,
+      "order": 9,
       "mode": 0,
       "inputs": [
         {
           "localized_name": "model",
           "name": "model",
           "type": "MODEL",
-          "link": 13
+          "link": 18
         },
         {
           "localized_name": "lora_name",
@@ -170,7 +171,7 @@
           "name": "MODEL",
           "type": "MODEL",
           "links": [
-            16
+            29
           ]
         }
       ],
@@ -237,7 +238,7 @@
           "name": "CLIP",
           "type": "CLIP",
           "links": [
-            14
+            20
           ]
         }
       ],
@@ -287,7 +288,7 @@
           "name": "VAE",
           "type": "VAE",
           "links": [
-            21
+            27
           ]
         }
       ],
@@ -303,6 +304,69 @@
       }
     },
     {
+      "id": 6,
+      "type": "LoraLoaderModelOnly",
+      "pos": [
+        734,
+        222
+      ],
+      "size": [
+        340,
+        82
+      ],
+      "flags": {},
+      "order": 7,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "model",
+          "name": "model",
+          "type": "MODEL",
+          "link": 19
+        },
+        {
+          "localized_name": "lora_name",
+          "name": "lora_name",
+          "type": "COMBO",
+          "widget": {
+            "name": "lora_name"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "strength_model",
+          "name": "strength_model",
+          "type": "FLOAT",
+          "widget": {
+            "name": "strength_model"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "MODEL",
+          "name": "MODEL",
+          "type": "MODEL",
+          "links": [
+            22
+          ]
+        }
+      ],
+      "title": "Character LoRA, composition steps (0–3)",
+      "properties": {
+        "Node name for S&R": "LoraLoaderModelOnly"
+      },
+      "widgets_values": [
+        "character_lora.safetensors",
+        0.3
+      ],
+      "widgets_values_named": {
+        "lora_name": "character_lora.safetensors",
+        "strength_model": 0.3
+      }
+    },
+    {
       "id": 10,
       "type": "CLIPTextEncode",
       "pos": [
@@ -314,14 +378,14 @@
         200
       ],
       "flags": {},
-      "order": 7,
+      "order": 8,
       "mode": 0,
       "inputs": [
         {
           "localized_name": "clip",
           "name": "clip",
           "type": "CLIP",
-          "link": 14
+          "link": 20
         },
         {
           "localized_name": "text",
@@ -339,20 +403,21 @@
           "name": "CONDITIONING",
           "type": "CONDITIONING",
           "links": [
-            15,
-            17
+            21,
+            23,
+            30
           ]
         }
       ],
-      "title": "Prompt (trigger word + her real age)",
+      "title": "Prompt (camera position first, trigger word, her real age)",
       "properties": {
         "Node name for S&R": "CLIPTextEncode"
       },
       "widgets_values": [
-        "A casual snapshot of a 25-year-old woman with long dark hair against a plain white wall. She is wearing a fitted white top; her gaze is turned to the side, her expression is neutral with a slight smile, her hair is tousled. The photo is an analog shot in the style of the '80s, with slight film grain and muted colors."
+        "Photo taken with a phone by her friend standing across the room at chest height; her whole body is in frame. A casual snapshot of a 25-year-old woman with long dark hair against a plain white wall. She is wearing a fitted white top; her gaze is turned to the side, her expression is neutral with a slight smile, her hair is tousled. The photo is an analog shot in the style of the '80s, with slight film grain and muted colors."
       ],
       "widgets_values_named": {
-        "text": "A casual snapshot of a 25-year-old woman with long dark hair against a plain white wall. She is wearing a fitted white top; her gaze is turned to the side, her expression is neutral with a slight smile, her hair is tousled. The photo is an analog shot in the style of the '80s, with slight film grain and muted colors."
+        "text": "Photo taken with a phone by her friend standing across the room at chest height; her whole body is in frame. A casual snapshot of a 25-year-old woman with long dark hair against a plain white wall. She is wearing a fitted white top; her gaze is turned to the side, her expression is neutral with a slight smile, her hair is tousled. The photo is an analog shot in the style of the '80s, with slight film grain and muted colors."
       }
     },
     {
@@ -367,14 +432,14 @@
         26
       ],
       "flags": {},
-      "order": 9,
+      "order": 10,
       "mode": 0,
       "inputs": [
         {
           "localized_name": "conditioning",
           "name": "conditioning",
           "type": "CONDITIONING",
-          "link": 15
+          "link": 21
         }
       ],
       "outputs": [
@@ -383,7 +448,8 @@
           "name": "CONDITIONING",
           "type": "CONDITIONING",
           "links": [
-            18
+            24,
+            31
           ]
         }
       ],
@@ -396,11 +462,11 @@
       "id": 12,
       "type": "EmptySD3LatentImage",
       "pos": [
-        2082,
-        86
+        1582,
+        420
       ],
       "size": [
-        322.853125,
+        460,
         106
       ],
       "flags": {},
@@ -441,7 +507,7 @@
           "name": "LATENT",
           "type": "LATENT",
           "links": [
-            19
+            25
           ]
         }
       ],
@@ -462,49 +528,58 @@
     },
     {
       "id": 13,
-      "type": "KSampler",
+      "type": "KSamplerAdvanced",
       "pos": [
         2082,
-        246
+        86
       ],
       "size": [
-        322.853125,
-        262
+        340,
+        334
       ],
       "flags": {},
-      "order": 10,
+      "order": 11,
       "mode": 0,
       "inputs": [
         {
           "localized_name": "model",
           "name": "model",
           "type": "MODEL",
-          "link": 16
+          "link": 22
         },
         {
           "localized_name": "positive",
           "name": "positive",
           "type": "CONDITIONING",
-          "link": 17
+          "link": 23
         },
         {
           "localized_name": "negative",
           "name": "negative",
           "type": "CONDITIONING",
-          "link": 18
+          "link": 24
         },
         {
           "localized_name": "latent_image",
           "name": "latent_image",
           "type": "LATENT",
-          "link": 19
+          "link": 25
         },
         {
-          "localized_name": "seed",
-          "name": "seed",
+          "localized_name": "add_noise",
+          "name": "add_noise",
+          "type": "COMBO",
+          "widget": {
+            "name": "add_noise"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "noise_seed",
+          "name": "noise_seed",
           "type": "INT",
           "widget": {
-            "name": "seed"
+            "name": "noise_seed"
           },
           "link": null
         },
@@ -545,11 +620,29 @@
           "link": null
         },
         {
-          "localized_name": "denoise",
-          "name": "denoise",
-          "type": "FLOAT",
+          "localized_name": "start_at_step",
+          "name": "start_at_step",
+          "type": "INT",
           "widget": {
-            "name": "denoise"
+            "name": "start_at_step"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "end_at_step",
+          "name": "end_at_step",
+          "type": "INT",
+          "widget": {
+            "name": "end_at_step"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "return_with_leftover_noise",
+          "name": "return_with_leftover_noise",
+          "type": "COMBO",
+          "widget": {
+            "name": "return_with_leftover_noise"
           },
           "link": null
         }
@@ -560,38 +653,44 @@
           "name": "LATENT",
           "type": "LATENT",
           "links": [
-            20
+            32
           ]
         }
       ],
-      "title": "Generate (euler / simple / 10 steps / CFG 1)",
+      "title": "Stage 1: composition (steps 0–3)",
       "properties": {
-        "Node name for S&R": "KSampler"
+        "Node name for S&R": "KSamplerAdvanced"
       },
       "widgets_values": [
+        "enable",
         0,
         "randomize",
         10,
         1,
         "euler",
         "simple",
-        1
+        0,
+        3,
+        "enable"
       ],
       "widgets_values_named": {
-        "seed": 0,
+        "add_noise": "enable",
+        "noise_seed": 0,
         "control_after_generate": "randomize",
         "steps": 10,
         "cfg": 1,
         "sampler_name": "euler",
         "scheduler": "simple",
-        "denoise": 1
+        "start_at_step": 0,
+        "end_at_step": 3,
+        "return_with_leftover_noise": "enable"
       }
     },
     {
       "id": 14,
       "type": "VAEDecode",
       "pos": [
-        2444.853125,
+        2842,
         86
       ],
       "size": [
@@ -599,20 +698,20 @@
         46
       ],
       "flags": {},
-      "order": 11,
+      "order": 13,
       "mode": 0,
       "inputs": [
         {
           "localized_name": "samples",
           "name": "samples",
           "type": "LATENT",
-          "link": 20
+          "link": 26
         },
         {
           "localized_name": "vae",
           "name": "vae",
           "type": "VAE",
-          "link": 21
+          "link": 27
         }
       ],
       "outputs": [
@@ -621,7 +720,7 @@
           "name": "IMAGE",
           "type": "IMAGE",
           "links": [
-            22
+            28
           ]
         }
       ],
@@ -634,7 +733,7 @@
       "id": 15,
       "type": "PostFXSaveJPEG",
       "pos": [
-        2444.853125,
+        2842,
         186
       ],
       "size": [
@@ -642,14 +741,14 @@
         154
       ],
       "flags": {},
-      "order": 12,
+      "order": 14,
       "mode": 0,
       "inputs": [
         {
           "localized_name": "images",
           "name": "images",
           "type": "IMAGE",
-          "link": 22
+          "link": 28
         },
         {
           "localized_name": "filename_prefix",
@@ -719,6 +818,166 @@
     },
     {
       "id": 16,
+      "type": "KSamplerAdvanced",
+      "pos": [
+        2462,
+        86
+      ],
+      "size": [
+        340,
+        334
+      ],
+      "flags": {},
+      "order": 12,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "model",
+          "name": "model",
+          "type": "MODEL",
+          "link": 29
+        },
+        {
+          "localized_name": "positive",
+          "name": "positive",
+          "type": "CONDITIONING",
+          "link": 30
+        },
+        {
+          "localized_name": "negative",
+          "name": "negative",
+          "type": "CONDITIONING",
+          "link": 31
+        },
+        {
+          "localized_name": "latent_image",
+          "name": "latent_image",
+          "type": "LATENT",
+          "link": 32
+        },
+        {
+          "localized_name": "add_noise",
+          "name": "add_noise",
+          "type": "COMBO",
+          "widget": {
+            "name": "add_noise"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "noise_seed",
+          "name": "noise_seed",
+          "type": "INT",
+          "widget": {
+            "name": "noise_seed"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "steps",
+          "name": "steps",
+          "type": "INT",
+          "widget": {
+            "name": "steps"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "cfg",
+          "name": "cfg",
+          "type": "FLOAT",
+          "widget": {
+            "name": "cfg"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "sampler_name",
+          "name": "sampler_name",
+          "type": "COMBO",
+          "widget": {
+            "name": "sampler_name"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "scheduler",
+          "name": "scheduler",
+          "type": "COMBO",
+          "widget": {
+            "name": "scheduler"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "start_at_step",
+          "name": "start_at_step",
+          "type": "INT",
+          "widget": {
+            "name": "start_at_step"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "end_at_step",
+          "name": "end_at_step",
+          "type": "INT",
+          "widget": {
+            "name": "end_at_step"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "return_with_leftover_noise",
+          "name": "return_with_leftover_noise",
+          "type": "COMBO",
+          "widget": {
+            "name": "return_with_leftover_noise"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "LATENT",
+          "name": "LATENT",
+          "type": "LATENT",
+          "links": [
+            26
+          ]
+        }
+      ],
+      "title": "Stage 2: likeness + look (steps 3–10)",
+      "properties": {
+        "Node name for S&R": "KSamplerAdvanced"
+      },
+      "widgets_values": [
+        "disable",
+        0,
+        "randomize",
+        10,
+        1,
+        "euler",
+        "simple",
+        3,
+        10000,
+        "disable"
+      ],
+      "widgets_values_named": {
+        "add_noise": "disable",
+        "noise_seed": 0,
+        "control_after_generate": "randomize",
+        "steps": 10,
+        "cfg": 1,
+        "sampler_name": "euler",
+        "scheduler": "simple",
+        "start_at_step": 3,
+        "end_at_step": 10000,
+        "return_with_leftover_noise": "disable"
+      }
+    },
+    {
+      "id": 17,
       "type": "MarkdownNote",
       "pos": [
         0,
@@ -736,19 +995,19 @@
       "title": "Read me",
       "properties": {},
       "widgets_values": [
-        "## Snapshot: phone / analog-snapshot generation\n\nThe recipe behind a top-rated Krea 2 realism image: **Realistic Snapshot LoRA at 1.5**, euler / simple / **10 steps / CFG 1**, **768×1376**, a plain background and an analog-film line in the prompt.\n\n**Before the first run**\n- Pick your file in **Character LoRA** and put its trigger word at the start of the prompt.\n- Set her **real age** in the prompt (currently 25).\n\n**What sells the realism:** simple settings (plain wall, bedroom, bathroom mirror) with nothing to render wrong, one light source you describe, and the \"analog shot… slight film grain and muted colors\" line. Busy scenes with signs and crowds undo it.\n\n**Then:** run the output through the realism pass if the skin needs more texture.\n"
+        "## Snapshot: phone / analog-snapshot generation\n\nThe recipe behind a top-rated Krea 2 realism image: **Realistic Snapshot LoRA at 1.5**, euler / simple / **10 steps / CFG 1**, **768×1376**, a plain background and an analog-film line in the prompt.\n\n**Before the first run**\n- Pick your file in **Character LoRA** and put its trigger word at the start of the prompt.\n- Set her **real age** in the prompt (currently 25).\n\n**Varied camera angles:** sampling runs in two stages. Steps 0–3 (composition) use the character LoRA at only 0.3, so its selfie-angle habit can't lock the framing; steps 3–10 use it at 0.85 for likeness. Start the prompt with where the camera is.\n\n**What sells the realism:** simple settings (plain wall, bedroom, bathroom mirror) with nothing to render wrong, one light source you describe, and the \"analog shot… slight film grain and muted colors\" line. Busy scenes with signs and crowds undo it.\n\n**Then:** run the output through the realism pass if the skin needs more texture.\n"
       ],
       "widgets_values_named": {
-        "text": "## Snapshot: phone / analog-snapshot generation\n\nThe recipe behind a top-rated Krea 2 realism image: **Realistic Snapshot LoRA at 1.5**, euler / simple / **10 steps / CFG 1**, **768×1376**, a plain background and an analog-film line in the prompt.\n\n**Before the first run**\n- Pick your file in **Character LoRA** and put its trigger word at the start of the prompt.\n- Set her **real age** in the prompt (currently 25).\n\n**What sells the realism:** simple settings (plain wall, bedroom, bathroom mirror) with nothing to render wrong, one light source you describe, and the \"analog shot… slight film grain and muted colors\" line. Busy scenes with signs and crowds undo it.\n\n**Then:** run the output through the realism pass if the skin needs more texture.\n"
+        "text": "## Snapshot: phone / analog-snapshot generation\n\nThe recipe behind a top-rated Krea 2 realism image: **Realistic Snapshot LoRA at 1.5**, euler / simple / **10 steps / CFG 1**, **768×1376**, a plain background and an analog-film line in the prompt.\n\n**Before the first run**\n- Pick your file in **Character LoRA** and put its trigger word at the start of the prompt.\n- Set her **real age** in the prompt (currently 25).\n\n**Varied camera angles:** sampling runs in two stages. Steps 0–3 (composition) use the character LoRA at only 0.3, so its selfie-angle habit can't lock the framing; steps 3–10 use it at 0.85 for likeness. Start the prompt with where the camera is.\n\n**What sells the realism:** simple settings (plain wall, bedroom, bathroom mirror) with nothing to render wrong, one light source you describe, and the \"analog shot… slight film grain and muted colors\" line. Busy scenes with signs and crowds undo it.\n\n**Then:** run the output through the realism pass if the skin needs more texture.\n"
       },
       "color": "#432",
       "bgcolor": "#653"
     },
     {
-      "id": 17,
+      "id": 18,
       "type": "MarkdownNote",
       "pos": [
-        2978.853125,
+        3376,
         30
       ],
       "size": [
@@ -763,10 +1022,10 @@
       "title": "Tuning",
       "properties": {},
       "widgets_values": [
-        "## Tuning\n\n- **Look too strong / faces drift** → *Realistic Snapshot LoRA* 1.0–1.2 (1.5 is the author's best; 1.0 does little).\n- **Likeness weak** → *Character LoRA* 0.95, or Snapshot LoRA down to 1.2.\n- **Sharper / more detail** → 1040×1520 instead of 768×1376 (loses some of the phone softness).\n- **SFW promo content** → swap the base model to Realism by Stable Yogi.\n"
+        "## Tuning\n\n- **Angles still repeat** → *Stage 1* end_at_step and *Stage 2* start_at_step to 4 (set both), or composition LoRA 0.\n- **Likeness weaker than before** → split at 2, or composition LoRA 0.5.\n\n- **Look too strong / faces drift** → *Realistic Snapshot LoRA* 1.0–1.2 (1.5 is the author's best; 1.0 does little).\n- **Likeness weak** → *Character LoRA* 0.95, or Snapshot LoRA down to 1.2.\n- **Sharper / more detail** → 1040×1520 instead of 768×1376 (loses some of the phone softness).\n- **SFW promo content** → swap the base model to Realism by Stable Yogi.\n- Keep *Stage 1* end_at_step and *Stage 2* start_at_step equal (3), and both samplers at 10 steps.\n"
       ],
       "widgets_values_named": {
-        "text": "## Tuning\n\n- **Look too strong / faces drift** → *Realistic Snapshot LoRA* 1.0–1.2 (1.5 is the author's best; 1.0 does little).\n- **Likeness weak** → *Character LoRA* 0.95, or Snapshot LoRA down to 1.2.\n- **Sharper / more detail** → 1040×1520 instead of 768×1376 (loses some of the phone softness).\n- **SFW promo content** → swap the base model to Realism by Stable Yogi.\n"
+        "text": "## Tuning\n\n- **Angles still repeat** → *Stage 1* end_at_step and *Stage 2* start_at_step to 4 (set both), or composition LoRA 0.\n- **Likeness weaker than before** → split at 2, or composition LoRA 0.5.\n\n- **Look too strong / faces drift** → *Realistic Snapshot LoRA* 1.0–1.2 (1.5 is the author's best; 1.0 does little).\n- **Likeness weak** → *Character LoRA* 0.95, or Snapshot LoRA down to 1.2.\n- **Sharper / more detail** → 1040×1520 instead of 768×1376 (loses some of the phone softness).\n- **SFW promo content** → swap the base model to Realism by Stable Yogi.\n- Keep *Stage 1* end_at_step and *Stage 2* start_at_step equal (3), and both samplers at 10 steps.\n"
       },
       "color": "#432",
       "bgcolor": "#653"
@@ -774,7 +1033,7 @@
   ],
   "links": [
     [
-      12,
+      17,
       1,
       0,
       2,
@@ -782,7 +1041,7 @@
       "MODEL"
     ],
     [
-      13,
+      18,
       2,
       0,
       3,
@@ -790,7 +1049,15 @@
       "MODEL"
     ],
     [
-      14,
+      19,
+      1,
+      0,
+      6,
+      0,
+      "MODEL"
+    ],
+    [
+      20,
       4,
       0,
       10,
@@ -798,7 +1065,7 @@
       "CLIP"
     ],
     [
-      15,
+      21,
       10,
       0,
       11,
@@ -806,15 +1073,15 @@
       "CONDITIONING"
     ],
     [
-      16,
-      3,
+      22,
+      6,
       0,
       13,
       0,
       "MODEL"
     ],
     [
-      17,
+      23,
       10,
       0,
       13,
@@ -822,7 +1089,7 @@
       "CONDITIONING"
     ],
     [
-      18,
+      24,
       11,
       0,
       13,
@@ -830,7 +1097,7 @@
       "CONDITIONING"
     ],
     [
-      19,
+      25,
       12,
       0,
       13,
@@ -838,15 +1105,15 @@
       "LATENT"
     ],
     [
-      20,
-      13,
+      26,
+      16,
       0,
       14,
       0,
       "LATENT"
     ],
     [
-      21,
+      27,
       5,
       0,
       14,
@@ -854,12 +1121,44 @@
       "VAE"
     ],
     [
-      22,
+      28,
       14,
       0,
       15,
       0,
       "IMAGE"
+    ],
+    [
+      29,
+      3,
+      0,
+      16,
+      0,
+      "MODEL"
+    ],
+    [
+      30,
+      10,
+      0,
+      16,
+      1,
+      "CONDITIONING"
+    ],
+    [
+      31,
+      11,
+      0,
+      16,
+      2,
+      "CONDITIONING"
+    ],
+    [
+      32,
+      13,
+      0,
+      16,
+      3,
+      "LATENT"
     ]
   ],
   "groups": [
@@ -870,7 +1169,7 @@
         710,
         0,
         758,
-        464
+        600
       ],
       "color": "#3f789e",
       "flags": {}
@@ -881,8 +1180,8 @@
       "bounding": [
         1558,
         0,
-        1330.853125,
-        532
+        1728,
+        550
       ],
       "color": "#b06634",
       "flags": {}

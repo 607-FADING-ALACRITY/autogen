@@ -29,6 +29,21 @@ Needs `comfyui-postfx` (for Save JPEG) plus core ComfyUI.
 
 The Realistic Snapshot license allows commercial use with no credit required. It was in paid early access until 2026-10-05 18:01 UTC.
 
+## Varied camera angles: two-stage sampling
+
+A character LoRA trained mostly on selfies learns the selfie camera angle along with the face, and at full strength it overrides prompt words like "wide shot". So sampling runs in two stages on the same latent:
+
+| Stage | Steps | Model | Decides |
+|---|---|---|---|
+| **Stage 1: composition** | 0–3 of 10 | base + character LoRA at **0.3** | camera position, framing, pose |
+| **Stage 2: likeness + look** | 3–10 of 10 | base + character LoRA **0.85** + Realistic Snapshot **1.5** | her face, skin, phone look |
+
+Stage 1 runs with `return_with_leftover_noise: enable`; stage 2 continues from the same step with `add_noise: disable`. Both samplers must use the same total steps, and stage 1's `end_at_step` must equal stage 2's `start_at_step`.
+
+To add this to any other workflow, replace its KSampler with two **KSampler (Advanced)** nodes wired exactly like that, plus a second *LoraLoaderModelOnly* for the low-strength composition chain.
+
+Start the prompt with where the camera is, e.g. *"Photo taken with a phone by her friend standing across the room at chest height; her whole body is in frame."*
+
 ## Use
 
 1. Pick your **Character LoRA** and put its trigger word at the start of the prompt.
@@ -40,6 +55,8 @@ The Realistic Snapshot license allows commercial use with no credit required. It
 
 | Problem | Change |
 |---|---|
+| Angles still repeat | Split at 4 (stage 1 `end_at_step` and stage 2 `start_at_step`), or composition LoRA 0 |
+| Likeness weaker than before | Split at 2, or composition LoRA 0.5 |
 | Look too strong, or faces drift | Realistic Snapshot LoRA 1.0–1.2 |
 | Likeness weak | Character LoRA 0.95, or Realistic Snapshot down to 1.2 |
 | Want more detail | 1040×1520 (loses some phone softness) |
