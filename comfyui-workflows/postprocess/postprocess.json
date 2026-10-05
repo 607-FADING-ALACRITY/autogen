@@ -1,8 +1,8 @@
 {
-  "id": "8088d049-6a7c-44e6-b7bf-10973353391e",
+  "id": "1858ccfb-2d88-4bce-84ee-2b455a5680fc",
   "revision": 0,
   "last_node_id": 42,
-  "last_link_id": 24,
+  "last_link_id": 26,
   "nodes": [
     {
       "id": 1,
@@ -44,9 +44,9 @@
           "name": "IMAGE",
           "type": "IMAGE",
           "links": [
-            14,
-            16,
-            18
+            15,
+            17,
+            19
           ]
         },
         {
@@ -100,7 +100,7 @@
           "name": "bg_model",
           "type": "BACKGROUND_REMOVAL",
           "links": [
-            13
+            14
           ]
         }
       ],
@@ -134,13 +134,13 @@
           "localized_name": "bg_removal_model",
           "name": "bg_removal_model",
           "type": "BACKGROUND_REMOVAL",
-          "link": 13
+          "link": 14
         },
         {
           "localized_name": "image",
           "name": "image",
           "type": "IMAGE",
-          "link": 14
+          "link": 15
         }
       ],
       "outputs": [
@@ -149,7 +149,7 @@
           "name": "mask",
           "type": "MASK",
           "links": [
-            19
+            20
           ]
         }
       ],
@@ -198,7 +198,7 @@
           "name": "DA3_MODEL",
           "type": "DA3_MODEL",
           "links": [
-            15
+            16
           ]
         }
       ],
@@ -234,13 +234,13 @@
           "localized_name": "da3_model",
           "name": "da3_model",
           "type": "DA3_MODEL",
-          "link": 15
+          "link": 16
         },
         {
           "localized_name": "image",
           "name": "image",
           "type": "IMAGE",
-          "link": 16
+          "link": 17
         },
         {
           "localized_name": "resolution",
@@ -276,7 +276,7 @@
           "name": "da3_geometry",
           "type": "DA3_GEOMETRY",
           "links": [
-            17
+            18
           ]
         }
       ],
@@ -314,7 +314,7 @@
           "localized_name": "da3_geometry",
           "name": "da3_geometry",
           "type": "DA3_GEOMETRY",
-          "link": 17
+          "link": 18
         },
         {
           "localized_name": "output",
@@ -350,7 +350,7 @@
           "name": "IMAGE",
           "type": "IMAGE",
           "links": [
-            20
+            21
           ]
         }
       ],
@@ -388,21 +388,21 @@
           "localized_name": "image",
           "name": "image",
           "type": "IMAGE",
-          "link": 18
+          "link": 19
         },
         {
           "localized_name": "subject_mask",
           "name": "subject_mask",
           "shape": 7,
           "type": "MASK",
-          "link": 19
+          "link": 20
         },
         {
           "localized_name": "depth",
           "name": "depth",
           "shape": 7,
           "type": "IMAGE",
-          "link": 20
+          "link": 21
         },
         {
           "localized_name": "enabled",
@@ -456,7 +456,7 @@
           "name": "IMAGE",
           "type": "IMAGE",
           "links": [
-            21
+            22
           ]
         }
       ],
@@ -498,7 +498,7 @@
           "localized_name": "image",
           "name": "image",
           "type": "IMAGE",
-          "link": 21
+          "link": 22
         },
         {
           "localized_name": "lut_name",
@@ -525,7 +525,7 @@
           "name": "IMAGE",
           "type": "IMAGE",
           "links": [
-            22
+            23
           ]
         }
       ],
@@ -543,15 +543,15 @@
       }
     },
     {
-      "id": 30,
-      "type": "PostFXSharpen",
+      "id": 21,
+      "type": "PostFXLens",
       "pos": [
-        482,
+        384,
         728
       ],
       "size": [
-        300,
-        106
+        320,
+        82
       ],
       "flags": {},
       "order": 10,
@@ -561,7 +561,70 @@
           "localized_name": "image",
           "name": "image",
           "type": "IMAGE",
-          "link": 22
+          "link": 23
+        },
+        {
+          "localized_name": "chromatic_aberration",
+          "name": "chromatic_aberration",
+          "type": "FLOAT",
+          "widget": {
+            "name": "chromatic_aberration"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "vignette",
+          "name": "vignette",
+          "type": "FLOAT",
+          "widget": {
+            "name": "vignette"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "IMAGE",
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            24
+          ]
+        }
+      ],
+      "title": "Lens",
+      "properties": {
+        "Node name for S&R": "PostFXLens"
+      },
+      "widgets_values": [
+        1,
+        0.25
+      ],
+      "widgets_values_named": {
+        "chromatic_aberration": 1,
+        "vignette": 0.25
+      }
+    },
+    {
+      "id": 30,
+      "type": "PostFXSharpen",
+      "pos": [
+        842,
+        728
+      ],
+      "size": [
+        300,
+        106
+      ],
+      "flags": {},
+      "order": 11,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "image",
+          "name": "image",
+          "type": "IMAGE",
+          "link": 24
         },
         {
           "localized_name": "amount",
@@ -597,7 +660,7 @@
           "name": "IMAGE",
           "type": "IMAGE",
           "links": [
-            23
+            25
           ]
         }
       ],
@@ -620,7 +683,7 @@
       "id": 31,
       "type": "PostFXFilmGrain",
       "pos": [
-        822,
+        1182,
         728
       ],
       "size": [
@@ -628,14 +691,14 @@
         154
       ],
       "flags": {},
-      "order": 11,
+      "order": 12,
       "mode": 0,
       "inputs": [
         {
           "localized_name": "image",
           "name": "image",
           "type": "IMAGE",
-          "link": 23
+          "link": 25
         },
         {
           "localized_name": "amount",
@@ -680,7 +743,7 @@
           "name": "IMAGE",
           "type": "IMAGE",
           "links": [
-            24
+            26
           ]
         }
       ],
@@ -707,7 +770,7 @@
       "id": 40,
       "type": "PostFXSaveJPEG",
       "pos": [
-        1260,
+        1620,
         728
       ],
       "size": [
@@ -715,14 +778,14 @@
         154
       ],
       "flags": {},
-      "order": 12,
+      "order": 13,
       "mode": 0,
       "inputs": [
         {
           "localized_name": "images",
           "name": "images",
           "type": "IMAGE",
-          "link": 24
+          "link": 26
         },
         {
           "localized_name": "filename_prefix",
@@ -809,10 +872,10 @@
       "title": "Read me",
       "properties": {},
       "widgets_values": [
-        "## Post-processing: portrait blur → LUT → sharpen → grain → JPEG\n\n**Custom nodes:** copy `comfyui-postfx/` into `ComfyUI/custom_nodes/`. No pip installs.\n\n**Models** (only needed while Portrait blur is on)\n- `models/background_removal/` birefnet.safetensors\n- `models/geometry_estimation/` depth_anything_3_mono_large.safetensors\n\n**LUTs:** drop `.cube` files into `models/luts/`. Two starters ship with the pack.\n\n**Run:** load an image in group 1 and queue. Output: `output/postfx/final_*.jpg`. The JPEG carries no prompt or workflow, and is tagged as AI-generated unless you change *ai_disclosure*.\n"
+        "## Post-processing: portrait blur → LUT → lens → sharpen → grain → JPEG\n\n**Custom nodes:** copy `comfyui-postfx/` into `ComfyUI/custom_nodes/`. No pip installs.\n\n**Models** (only needed while Portrait blur is on)\n- `models/background_removal/` birefnet.safetensors\n- `models/geometry_estimation/` depth_anything_3_mono_large.safetensors\n\n**LUTs:** drop `.cube` files into `models/luts/`. Two starters ship with the pack.\n\n**Run:** load an image in group 1 and queue. Output: `output/postfx/final_*.jpg`. The JPEG carries no prompt or workflow, and is tagged as AI-generated unless you change *ai_disclosure*.\n"
       ],
       "widgets_values_named": {
-        "text": "## Post-processing: portrait blur → LUT → sharpen → grain → JPEG\n\n**Custom nodes:** copy `comfyui-postfx/` into `ComfyUI/custom_nodes/`. No pip installs.\n\n**Models** (only needed while Portrait blur is on)\n- `models/background_removal/` birefnet.safetensors\n- `models/geometry_estimation/` depth_anything_3_mono_large.safetensors\n\n**LUTs:** drop `.cube` files into `models/luts/`. Two starters ship with the pack.\n\n**Run:** load an image in group 1 and queue. Output: `output/postfx/final_*.jpg`. The JPEG carries no prompt or workflow, and is tagged as AI-generated unless you change *ai_disclosure*.\n"
+        "text": "## Post-processing: portrait blur → LUT → lens → sharpen → grain → JPEG\n\n**Custom nodes:** copy `comfyui-postfx/` into `ComfyUI/custom_nodes/`. No pip installs.\n\n**Models** (only needed while Portrait blur is on)\n- `models/background_removal/` birefnet.safetensors\n- `models/geometry_estimation/` depth_anything_3_mono_large.safetensors\n\n**LUTs:** drop `.cube` files into `models/luts/`. Two starters ship with the pack.\n\n**Run:** load an image in group 1 and queue. Output: `output/postfx/final_*.jpg`. The JPEG carries no prompt or workflow, and is tagged as AI-generated unless you change *ai_disclosure*.\n"
       },
       "color": "#432",
       "bgcolor": "#653"
@@ -821,12 +884,12 @@
       "id": 42,
       "type": "MarkdownNote",
       "pos": [
-        1794,
+        2154,
         672
       ],
       "size": [
         520,
-        210
+        230
       ],
       "flags": {},
       "order": 4,
@@ -836,10 +899,10 @@
       "title": "Tuning",
       "properties": {},
       "widgets_values": [
-        "## Tuning\n\n- **Portrait blur off** → set *enabled* to false. Depth and subject models are skipped entirely.\n- **More / less blur** → *blur_strength* (% of long side). Phone portrait mode ≈ 1–2.\n- **Background goes soft too gradually** → lower *falloff* (0.15 = soft right behind the subject).\n- **Hair edge looks cut out** → raise *edge_softness* to 3–4.\n- **Grade too strong** → *LUT grade* strength 0.4–0.6.\n- **Crunchy skin** → raise *Sharpen* threshold to 0.04, or amount to 0.3.\n- **Grain** → 0.2 subtle, 0.3 phone, 0.5+ film. Raise *size* for coarser grain.\n- **Smaller files** → quality 88 and 4:2:0.\n"
+        "## Tuning\n\n- **Portrait blur off** → set *enabled* to false. Depth and subject models are skipped entirely.\n- **More / less blur** → *blur_strength* (% of long side). Phone portrait mode ≈ 1–2.\n- **Background goes soft too gradually** → lower *falloff* (0.15 = soft right behind the subject).\n- **Hair edge looks cut out** → raise *edge_softness* to 3–4.\n- **Grade too strong** → *LUT grade* strength 0.4–0.6.\n- **Lens** → *chromatic_aberration* 0 and *vignette* 0 turn it off.\n- **Crunchy skin** → raise *Sharpen* threshold to 0.04, or amount to 0.3.\n- **Grain** → 0.2 subtle, 0.3 phone, 0.5+ film. Raise *size* for coarser grain.\n- **Smaller files** → quality 88 and 4:2:0.\n"
       ],
       "widgets_values_named": {
-        "text": "## Tuning\n\n- **Portrait blur off** → set *enabled* to false. Depth and subject models are skipped entirely.\n- **More / less blur** → *blur_strength* (% of long side). Phone portrait mode ≈ 1–2.\n- **Background goes soft too gradually** → lower *falloff* (0.15 = soft right behind the subject).\n- **Hair edge looks cut out** → raise *edge_softness* to 3–4.\n- **Grade too strong** → *LUT grade* strength 0.4–0.6.\n- **Crunchy skin** → raise *Sharpen* threshold to 0.04, or amount to 0.3.\n- **Grain** → 0.2 subtle, 0.3 phone, 0.5+ film. Raise *size* for coarser grain.\n- **Smaller files** → quality 88 and 4:2:0.\n"
+        "text": "## Tuning\n\n- **Portrait blur off** → set *enabled* to false. Depth and subject models are skipped entirely.\n- **More / less blur** → *blur_strength* (% of long side). Phone portrait mode ≈ 1–2.\n- **Background goes soft too gradually** → lower *falloff* (0.15 = soft right behind the subject).\n- **Hair edge looks cut out** → raise *edge_softness* to 3–4.\n- **Grade too strong** → *LUT grade* strength 0.4–0.6.\n- **Lens** → *chromatic_aberration* 0 and *vignette* 0 turn it off.\n- **Crunchy skin** → raise *Sharpen* threshold to 0.04, or amount to 0.3.\n- **Grain** → 0.2 subtle, 0.3 phone, 0.5+ film. Raise *size* for coarser grain.\n- **Smaller files** → quality 88 and 4:2:0.\n"
       },
       "color": "#432",
       "bgcolor": "#653"
@@ -847,7 +910,7 @@
   ],
   "links": [
     [
-      13,
+      14,
       10,
       0,
       11,
@@ -855,7 +918,7 @@
       "BACKGROUND_REMOVAL"
     ],
     [
-      14,
+      15,
       1,
       0,
       11,
@@ -863,7 +926,7 @@
       "IMAGE"
     ],
     [
-      15,
+      16,
       12,
       0,
       13,
@@ -871,7 +934,7 @@
       "DA3_MODEL"
     ],
     [
-      16,
+      17,
       1,
       0,
       13,
@@ -879,7 +942,7 @@
       "IMAGE"
     ],
     [
-      17,
+      18,
       13,
       0,
       14,
@@ -887,7 +950,7 @@
       "DA3_GEOMETRY"
     ],
     [
-      18,
+      19,
       1,
       0,
       15,
@@ -895,7 +958,7 @@
       "IMAGE"
     ],
     [
-      19,
+      20,
       11,
       0,
       15,
@@ -903,7 +966,7 @@
       "MASK"
     ],
     [
-      20,
+      21,
       14,
       0,
       15,
@@ -911,7 +974,7 @@
       "IMAGE"
     ],
     [
-      21,
+      22,
       15,
       0,
       20,
@@ -919,15 +982,23 @@
       "IMAGE"
     ],
     [
-      22,
+      23,
       20,
+      0,
+      21,
+      0,
+      "IMAGE"
+    ],
+    [
+      24,
+      21,
       0,
       30,
       0,
       "IMAGE"
     ],
     [
-      23,
+      25,
       30,
       0,
       31,
@@ -935,7 +1006,7 @@
       "IMAGE"
     ],
     [
-      24,
+      26,
       31,
       0,
       40,
@@ -970,11 +1041,11 @@
     },
     {
       "id": 3,
-      "title": "3 · Grade",
+      "title": "3 · Grade + lens",
       "bounding": [
         0,
         642,
-        368,
+        728,
         192
       ],
       "color": "#b06634",
@@ -984,7 +1055,7 @@
       "id": 4,
       "title": "4 · Sharpen + grain",
       "bounding": [
-        458,
+        818,
         642,
         688,
         264
@@ -996,7 +1067,7 @@
       "id": 5,
       "title": "5 · Export",
       "bounding": [
-        1236,
+        1596,
         642,
         468,
         264

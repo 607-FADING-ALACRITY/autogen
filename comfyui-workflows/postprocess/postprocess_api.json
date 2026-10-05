@@ -116,11 +116,25 @@
       "title": "LUT grade"
     }
   },
+  "21": {
+    "class_type": "PostFXLens",
+    "inputs": {
+      "image": [
+        "20",
+        0
+      ],
+      "chromatic_aberration": 1.0,
+      "vignette": 0.25
+    },
+    "_meta": {
+      "title": "Lens"
+    }
+  },
   "30": {
     "class_type": "PostFXSharpen",
     "inputs": {
       "image": [
-        "20",
+        "21",
         0
       ],
       "amount": 0.5,

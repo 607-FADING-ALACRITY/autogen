@@ -24,33 +24,65 @@ def node(class_type, title, **inputs):
     return {"class_type": class_type, "inputs": inputs, "_meta": {"title": title}}
 
 
-def build():
-    p = {}
-    p["1"] = node("LoadImage", "Input image", image="example.png")
+# Node ids of the finishing chain in postprocess.json. Other workflows reuse add_finish() with their own ids.
+FINISH_IDS = {"bg_model": "10", "mask": "11", "depth_model": "12", "depth": "13", "depth_map": "14",
+              "blur": "15", "lut": "20", "lens": "21", "sharpen": "30", "grain": "31", "save": "40"}
 
+
+def add_finish(p, image, ids=FINISH_IDS, blur_enabled=True, filename_prefix="postfx/final",
+               lut_strength=0.75, grain_amount=0.3, quality=92, subsampling="4:4:4 (sharpest color)"):
+    """Adds portrait blur (optional) -> LUT -> lens -> sharpen -> grain -> JPEG after `image`."""
+    i = ids
     # Portrait mode: subject mask (BiRefNet) + depth (Depth Anything 3), both skipped when disabled
-    p["10"] = node("LoadBackgroundRemovalModel", "Subject model (BiRefNet)", bg_removal_name=BG_REMOVAL_MODEL)
-    p["11"] = node("RemoveBackground", "Subject mask", bg_removal_model=["10", 0], image=["1", 0])
-    p["12"] = node("LoadDA3Model", "Depth model (Depth Anything 3)", model_name=DEPTH_MODEL, weight_dtype="default")
-    p["13"] = node("DA3Inference", "Estimate depth", da3_model=["12", 0], image=["1", 0], resolution=504,
-                   resize_method="upper_bound_resize", mode="mono")
-    p["14"] = node("DA3Render", "Depth map (near = white)", da3_geometry=["13", 0], output="depth",
-                   **{"output.normalization": "v2_style", "output.apply_sky_clip": False})
-    p["15"] = node("PostFXPortraitBlur", "Portrait blur", image=["1", 0], enabled=True, blur_strength=1.5,
-                   falloff=0.3, highlight_bloom=0.35, edge_softness=1.5, subject_mask=["11", 0], depth=["14", 0])
+    p[i["bg_model"]] = node("LoadBackgroundRemovalModel", "Subject model (BiRefNet)", bg_removal_name=BG_REMOVAL_MODEL)
+    p[i["mask"]] = node("RemoveBackground", "Subject mask", bg_removal_model=[i["bg_model"], 0], image=image)
+    p[i["depth_model"]] = node("LoadDA3Model", "Depth model (Depth Anything 3)", model_name=DEPTH_MODEL,
+                               weight_dtype="default")
+    p[i["depth"]] = node("DA3Inference", "Estimate depth", da3_model=[i["depth_model"], 0], image=image,
+                         resolution=504, resize_method="upper_bound_resize", mode="mono")
+    p[i["depth_map"]] = node("DA3Render", "Depth map (near = white)", da3_geometry=[i["depth"], 0], output="depth",
+                             **{"output.normalization": "v2_style", "output.apply_sky_clip": False})
+    p[i["blur"]] = node("PostFXPortraitBlur", "Portrait blur", image=image, enabled=blur_enabled, blur_strength=1.5,
+                        falloff=0.3, highlight_bloom=0.35, edge_softness=1.5, subject_mask=[i["mask"], 0],
+                        depth=[i["depth_map"], 0])
+    p[i["lut"]] = node("PostFXApplyLUT", "LUT grade", image=[i["blur"], 0], lut_name=DEFAULT_LUT,
+                       strength=lut_strength)
+    p[i["lens"]] = node("PostFXLens", "Lens", image=[i["lut"], 0], chromatic_aberration=1.0, vignette=0.25)
+    p[i["sharpen"]] = node("PostFXSharpen", "Sharpen", image=[i["lens"], 0], amount=0.5, radius=1.0, threshold=0.02)
+    p[i["grain"]] = node("PostFXFilmGrain", "Grain", image=[i["sharpen"], 0], amount=grain_amount, size=1.5,
+                         color=0.15, seed=0)
+    p[i["save"]] = node("PostFXSaveJPEG", "Save JPEG", images=[i["grain"], 0], filename_prefix=filename_prefix,
+                        quality=quality, chroma_subsampling=subsampling, progressive=True,
+                        ai_disclosure="AI-generated")
 
-    p["20"] = node("PostFXApplyLUT", "LUT grade", image=["15", 0], lut_name=DEFAULT_LUT, strength=0.75)
-    p["30"] = node("PostFXSharpen", "Sharpen", image=["20", 0], amount=0.5, radius=1.0, threshold=0.02)
-    p["31"] = node("PostFXFilmGrain", "Grain", image=["30", 0], amount=0.3, size=1.5, color=0.15, seed=0)
-    p["40"] = node("PostFXSaveJPEG", "Save JPEG", images=["31", 0], filename_prefix="postfx/final", quality=92,
-                   chroma_subsampling="4:4:4 (sharpest color)", progressive=True, ai_disclosure="AI-generated")
+
+def finish_groups(ids=FINISH_IDS, first_number=2):
+    """Layout groups for add_finish(), numbered from first_number."""
+    i, n = ids, first_number
+    return [
+        {"title": f"{n} · Portrait mode (optional)", "color": "#a1309b",
+         "columns": [[i["bg_model"], i["mask"]], [i["depth_model"], i["depth"], i["depth_map"]], [i["blur"]]]},
+        {"title": f"{n + 1} · Grade + lens", "color": "#b06634", "columns": [[i["lut"]], [i["lens"]]]},
+        {"title": f"{n + 2} · Sharpen + grain", "color": "#88aa88", "columns": [[i["sharpen"]], [i["grain"]]]},
+        {"title": f"{n + 3} · Export", "color": "#3f789e", "columns": [[i["save"]]]},
+    ]
+
+
+def finish_widths(ids=FINISH_IDS):
+    return {ids[k]: w for k, w in (("bg_model", 320), ("depth_model", 340), ("depth", 320), ("depth_map", 320),
+                                   ("blur", 340), ("lut", 320), ("lens", 320), ("sharpen", 300), ("grain", 300),
+                                   ("save", 420))}
+
+
+def build():
+    p = {"1": node("LoadImage", "Input image", image="example.png")}
+    add_finish(p, ["1", 0])
     return p
 
 
-WIDTHS = {"1": 360, "10": 320, "12": 340, "13": 320, "14": 320, "15": 340, "20": 320, "30": 300, "31": 300,
-          "40": 420}
+WIDTHS = {"1": 360, **finish_widths()}
 
-SETUP_NOTE = """## Post-processing: portrait blur → LUT → sharpen → grain → JPEG
+SETUP_NOTE = """## Post-processing: portrait blur → LUT → lens → sharpen → grain → JPEG
 
 **Custom nodes:** copy `comfyui-postfx/` into `ComfyUI/custom_nodes/`. No pip installs.
 
@@ -70,6 +102,7 @@ TUNING_NOTE = """## Tuning
 - **Background goes soft too gradually** → lower *falloff* (0.15 = soft right behind the subject).
 - **Hair edge looks cut out** → raise *edge_softness* to 3–4.
 - **Grade too strong** → *LUT grade* strength 0.4–0.6.
+- **Lens** → *chromatic_aberration* 0 and *vignette* 0 turn it off.
 - **Crunchy skin** → raise *Sharpen* threshold to 0.04, or amount to 0.3.
 - **Grain** → 0.2 subtle, 0.3 phone, 0.5+ film. Raise *size* for coarser grain.
 - **Smaller files** → quality 88 and 4:2:0.
@@ -78,15 +111,11 @@ TUNING_NOTE = """## Tuning
 
 def main():
     prompt = build()
+    groups = finish_groups()
     rows = [
         [{"note": {"title": "Read me", "text": SETUP_NOTE, "width": 640, "height": 250}},
-         {"title": "1 · Input", "color": "#3f789e", "columns": [["1"]]},
-         {"title": "2 · Portrait mode (optional)", "color": "#a1309b",
-          "columns": [["10", "11"], ["12", "13", "14"], ["15"]]}],
-        [{"title": "3 · Grade", "color": "#b06634", "columns": [["20"]]},
-         {"title": "4 · Sharpen + grain", "color": "#88aa88", "columns": [["30"], ["31"]]},
-         {"title": "5 · Export", "color": "#3f789e", "columns": [["40"]]},
-         {"note": {"title": "Tuning", "text": TUNING_NOTE, "width": 520, "height": 210}}],
+         {"title": "1 · Input", "color": "#3f789e", "columns": [["1"]]}, groups[0]],
+        [*groups[1:], {"note": {"title": "Tuning", "text": TUNING_NOTE, "width": 520, "height": 230}}],
     ]
     laid_out = {i for row in rows for block in row for col in block.get("columns", []) for i in col}
     if laid_out != set(prompt):

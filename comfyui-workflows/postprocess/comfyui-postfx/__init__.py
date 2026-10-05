@@ -3,6 +3,7 @@
 Nodes (category "PostFX"):
   PostFX · Portrait Blur   depth/mask-driven lens blur with halo-free edges and highlight bloom
   PostFX · Apply LUT       .cube 3D/1D LUTs with a strength slider
+  PostFX · Lens            lateral chromatic aberration + vignetting
   PostFX · Sharpen         luminance unsharp mask with a noise threshold
   PostFX · Film Grain      luminance-weighted, sized, optionally colored grain
   PostFX · Save JPEG       quality/subsampling control, sRGB profile, no workflow/prompt metadata,
@@ -349,6 +350,68 @@ class PostFXApplyLUT:
 
 
 # ---------------------------------------------------------------------------------------------
+# Lens: lateral chromatic aberration + vignetting
+# ---------------------------------------------------------------------------------------------
+def lens_effects(rgb, chromatic_aberration, vignette):
+    """rgb: (B, H, W, 3) sRGB.
+
+    Chromatic aberration magnifies red slightly and shrinks blue around the image center, so
+    edges pick up red/cyan fringes that grow toward the corners (shift = chromatic_aberration
+    pixels at the corners per 1000 px of image diagonal). Vignetting darkens toward the corners
+    in linear light; vignette = 1.0 loses ~60% of the light (about 1.3 stops) in the corners.
+    """
+    batch, height, width, _ = rgb.shape
+    out = rgb
+    yy = torch.linspace(-1.0, 1.0, height, device=rgb.device, dtype=rgb.dtype)[:, None].expand(height, width)
+    xx = torch.linspace(-1.0, 1.0, width, device=rgb.device, dtype=rgb.dtype)[None, :].expand(height, width)
+    if chromatic_aberration > 0:
+        half_diagonal = 0.5 * math.hypot(height, width)
+        shift_px = chromatic_aberration * (2.0 * half_diagonal) / 1000.0
+        scale = shift_px / half_diagonal
+        planes = out.permute(0, 3, 1, 2)                                     # (B, 3, H, W)
+        channels = [planes[:, 1:2]]
+        for c, factor in ((0, 1.0 / (1.0 + scale)), (2, 1.0 / (1.0 - scale))):
+            grid = torch.stack([xx * factor, yy * factor], dim=-1)[None].expand(batch, height, width, 2)
+            channels.insert(c, F.grid_sample(planes[:, c:c + 1], grid, mode="bilinear",
+                                             padding_mode="border", align_corners=True))
+        out = torch.cat(channels, dim=1).permute(0, 2, 3, 1)
+    if vignette > 0:
+        aspect = width / height
+        r2 = (xx * xx * aspect * aspect + yy * yy) / (aspect * aspect + 1.0)   # 0 center, 1 corners
+        falloff = 1.0 - vignette * 0.6 * r2 ** 1.25
+        out = linear_to_srgb(srgb_to_linear(out) * falloff[None, ..., None])
+    return out.clamp(0.0, 1.0)
+
+
+class PostFXLens:
+    """The optical fingerprints a phone lens leaves and AI renders lack: faint color fringing
+    toward the corners and gentle corner falloff."""
+
+    CATEGORY = "PostFX"
+    RETURN_TYPES = ("IMAGE",)
+    FUNCTION = "apply"
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "image": ("IMAGE",),
+                "chromatic_aberration": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 6.0, "step": 0.1,
+                                                   "tooltip": "Red/cyan fringe width at the corners, in pixels per "
+                                                              "1000 px of diagonal. 0.5–1.5 reads as a phone lens."}),
+                "vignette": ("FLOAT", {"default": 0.25, "min": 0.0, "max": 1.0, "step": 0.05,
+                                       "tooltip": "Corner darkening. 0.25 ≈ a third of a stop."}),
+            }
+        }
+
+    def apply(self, image, chromatic_aberration, vignette):
+        if chromatic_aberration <= 0 and vignette <= 0:
+            return (image,)
+        rgb, extra = _split_alpha(image)
+        return (_join_alpha(lens_effects(rgb, chromatic_aberration, vignette), extra),)
+
+
+# ---------------------------------------------------------------------------------------------
 # Sharpen
 # ---------------------------------------------------------------------------------------------
 class PostFXSharpen:
@@ -540,6 +603,7 @@ class PostFXSaveJPEG:
 NODE_CLASS_MAPPINGS = {
     "PostFXPortraitBlur": PostFXPortraitBlur,
     "PostFXApplyLUT": PostFXApplyLUT,
+    "PostFXLens": PostFXLens,
     "PostFXSharpen": PostFXSharpen,
     "PostFXFilmGrain": PostFXFilmGrain,
     "PostFXSaveJPEG": PostFXSaveJPEG,
@@ -548,6 +612,7 @@ NODE_CLASS_MAPPINGS = {
 NODE_DISPLAY_NAME_MAPPINGS = {
     "PostFXPortraitBlur": "PostFX · Portrait Blur",
     "PostFXApplyLUT": "PostFX · Apply LUT",
+    "PostFXLens": "PostFX · Lens",
     "PostFXSharpen": "PostFX · Sharpen",
     "PostFXFilmGrain": "PostFX · Film Grain",
     "PostFXSaveJPEG": "PostFX · Save JPEG",

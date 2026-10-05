@@ -95,7 +95,7 @@ Notes on the files:
 
 For `faceswap_only.json`, load the target image in group 1 instead of writing a prompt. Output: `faceswap/swap_*`.
 
-To finish either output with portrait blur, a LUT grade, grain and a metadata-clean JPEG, run it through [`../postprocess`](../postprocess/README.md).
+To finish either output with portrait blur, a LUT grade, grain and a metadata-clean JPEG, run it through [`../postprocess`](../postprocess/README.md). If skin or faces still look AI-generated, run [`../realism-pass`](../realism-pass/README.md) instead; it includes the same finishing chain.
 
 ## How it works
 

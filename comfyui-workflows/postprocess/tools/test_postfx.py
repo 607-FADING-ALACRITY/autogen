@@ -86,6 +86,35 @@ def test_lut_node_strength_zero_is_identity():
     assert out is img
 
 
+# ---- Lens --------------------------------------------------------------------------------------
+def test_lens_zero_is_identity():
+    img = gradient_image()
+    assert postfx.PostFXLens().apply(img, 0.0, 0.0)[0] is img
+
+
+def test_vignette_darkens_corners_only():
+    img = torch.full((1, 101, 151, 3), 0.6)
+    (out,) = postfx.PostFXLens().apply(img, 0.0, 1.0)
+    assert abs(float(out[0, 50, 75, 0]) - 0.6) < 1e-4                  # center untouched
+    assert float(out[0, 0, 0, 0]) < 0.6 * 0.75                           # corner clearly darker
+    assert float(out[0, 50, 0, 0]) > float(out[0, 0, 0, 0])             # edge midpoint between the two
+
+
+def test_chromatic_aberration_fringes_grow_toward_corners():
+    img = torch.zeros(1, 200, 200, 3)
+    img[:, 20:30, 20:30] = 1.0                                           # white square near the top-left corner
+    img[:, 95:105, 95:105] = 1.0                                         # and one at the center
+    (out,) = postfx.PostFXLens().apply(img, 6.0, 0.0)
+    corner, center = out[0, 10:40, 10:40], out[0, 85:115, 85:115]
+    assert float((corner[..., 0] - corner[..., 2]).abs().sum()) > 1.0     # red/blue split at the corner
+    assert float((center[..., 0] - center[..., 2]).abs().sum()) < 0.1 * float((corner[..., 0] - corner[..., 2]).abs().sum())
+    assert torch.allclose(out[..., 1], img[..., 1])                      # green is the reference channel
+    # red is magnified (pushed outward, toward the top-left), blue pulled inward
+    red_cols = corner[..., 0].sum(0).nonzero().flatten()
+    blue_cols = corner[..., 2].sum(0).nonzero().flatten()
+    assert int(red_cols.min()) < int(blue_cols.min())
+
+
 # ---- Sharpen -----------------------------------------------------------------------------------
 def test_sharpen_leaves_flat_areas_alone_and_boosts_edges():
     img = torch.full((1, 32, 32, 3), 0.5)

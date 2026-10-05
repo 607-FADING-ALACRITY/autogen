@@ -1,15 +1,16 @@
-# Post-processing: portrait blur → LUT → sharpen → grain → JPEG
+# Post-processing: portrait blur → LUT → lens → sharpen → grain → JPEG
 
 A finishing pass for any image, including the output of `../fineporn-faceswap`:
 
 ```
-image ──► portrait blur (optional) ──► LUT grade ──► sharpen ──► film grain ──► JPEG
+image ──► portrait blur (optional) ──► LUT grade ──► lens ──► sharpen ──► film grain ──► JPEG
              ▲            ▲
    subject mask (BiRefNet)  depth (Depth Anything 3)     ← both skipped entirely when blur is off
 ```
 
 The order is deliberate:
 - Blur comes before the grade, so bokeh takes the grade's colors like a real lens would.
+- Lens effects come after the grade and before sharpening and grain, the same order light takes: lens, then sensor.
 - Sharpening comes before grain, so the grain itself isn't sharpened.
 - Grain is last, so it sits evenly over blurred and sharp areas alike. A blurred background with no grain is the most common giveaway of a fake portrait mode.
 
@@ -77,6 +78,17 @@ Applies Adobe/Resolve `.cube` LUTs, 3D (trilinear) or 1D, and honors `DOMAIN_MIN
   - `warm_film`: soft S-curve, lifted blacks, warm highlights, slightly cool shadows, −8% saturation.
   - `bright_clean`: +⅓ stop with highlight roll-off, low contrast, faint warmth.
 
+### PostFX · Lens
+
+The optical fingerprints a phone lens leaves and AI renders lack.
+
+| Setting | Default | Effect |
+|---|---|---|
+| `chromatic_aberration` | 1.0 | Red/cyan fringe width at the corners, in pixels per 1000 px of image diagonal. 0.5–1.5 reads as a phone lens. Only visible on sharp edges. |
+| `vignette` | 0.25 | Corner darkening in linear light. 0.25 is about a third of a stop; 1.0 is about 1.3 stops. |
+
+Set both to 0 to turn it off.
+
 ### PostFX · Sharpen
 
 An unsharp mask applied to luminance only, so edges get no color fringes.
@@ -129,6 +141,7 @@ Upload the image with `POST /upload/image`, then post `{"prompt": <postprocess_a
 | `1` | `image` |
 | `15` | `enabled`, `blur_strength`, `falloff` |
 | `20` | `lut_name`, `strength` |
+| `21` | `chromatic_aberration`, `vignette` |
 | `30` | `amount`, `threshold` |
 | `31` | `amount`, `seed` (set a new seed per image) |
 | `40` | `filename_prefix`, `quality`, `ai_disclosure` |
@@ -140,8 +153,9 @@ Everything here runs on CPU, so unlike the face-swap stages this pipeline was **
 - **Visual check:** the subject stays sharp, the background blur grades with depth, there's no halo, and the sky keeps its color.
 - **JPEG check:** the file carries the AI tag and ICC profile, has no EXIF, and contains no workflow or prompt text.
 - **Timing:** about 50 s per image on a 4-core CPU with the blur on, almost all of it BiRefNet and Depth Anything. With the blur off it takes 0.5 s, confirming both models are skipped. A GPU is far faster; it wasn't measured here.
-- **Unit tests:** `tools/test_postfx.py` has 20 tests covering:
+- **Unit tests:** `tools/test_postfx.py` has 23 tests covering:
   - identity, channel order, 1D and domain handling for LUTs
+  - lens: identity at zero, vignette falloff, fringe direction and growth toward corners
   - sharpen threshold behavior
   - grain calibration and determinism
   - blur: subject preservation, no halo, depth-driven focus, bloom that spares sky and skyline, lazy skipping
