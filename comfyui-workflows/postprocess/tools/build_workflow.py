@@ -30,9 +30,14 @@ FINISH_IDS = {"bg_model": "10", "mask": "11", "depth_model": "12", "depth": "13"
 
 
 def add_finish(p, image, ids=FINISH_IDS, blur_enabled=True, filename_prefix="postfx/final",
-               lut_strength=0.75, grain_amount=0.3, quality=92, subsampling="4:4:4 (sharpest color)"):
-    """Adds portrait blur (optional) -> LUT -> lens -> sharpen -> grain -> JPEG after `image`."""
+               lut_strength=0.75, grain_amount=0.3, quality=92, subsampling="4:4:4 (sharpest color)",
+               include_blur=True):
+    """Adds portrait blur (optional) -> LUT -> lens -> sharpen -> grain -> JPEG after `image`.
+    include_blur=False leaves the portrait group out entirely (no BiRefNet / Depth Anything files needed)."""
     i = ids
+    if not include_blur:
+        _add_grade_to_save(p, image, i, filename_prefix, lut_strength, grain_amount, quality, subsampling)
+        return
     # Portrait mode: subject mask (BiRefNet) + depth (Depth Anything 3), both skipped when disabled
     p[i["bg_model"]] = node("LoadBackgroundRemovalModel", "Subject model (BiRefNet)", bg_removal_name=BG_REMOVAL_MODEL)
     p[i["mask"]] = node("RemoveBackground", "Subject mask", bg_removal_model=[i["bg_model"], 0], image=image)
@@ -45,8 +50,11 @@ def add_finish(p, image, ids=FINISH_IDS, blur_enabled=True, filename_prefix="pos
     p[i["blur"]] = node("PostFXPortraitBlur", "Portrait blur", image=image, enabled=blur_enabled, blur_strength=1.5,
                         falloff=0.3, highlight_bloom=0.35, edge_softness=1.5, subject_mask=[i["mask"], 0],
                         depth=[i["depth_map"], 0])
-    p[i["lut"]] = node("PostFXApplyLUT", "LUT grade", image=[i["blur"], 0], lut_name=DEFAULT_LUT,
-                       strength=lut_strength)
+    _add_grade_to_save(p, [i["blur"], 0], i, filename_prefix, lut_strength, grain_amount, quality, subsampling)
+
+
+def _add_grade_to_save(p, image, i, filename_prefix, lut_strength, grain_amount, quality, subsampling):
+    p[i["lut"]] = node("PostFXApplyLUT", "LUT grade", image=image, lut_name=DEFAULT_LUT, strength=lut_strength)
     p[i["lens"]] = node("PostFXLens", "Lens", image=[i["lut"], 0], chromatic_aberration=1.0, vignette=0.25)
     p[i["sharpen"]] = node("PostFXSharpen", "Sharpen", image=[i["lens"], 0], amount=0.5, radius=1.0, threshold=0.02)
     p[i["grain"]] = node("PostFXFilmGrain", "Grain", image=[i["sharpen"], 0], amount=grain_amount, size=1.5,
@@ -56,15 +64,19 @@ def add_finish(p, image, ids=FINISH_IDS, blur_enabled=True, filename_prefix="pos
                         ai_disclosure="AI-generated")
 
 
-def finish_groups(ids=FINISH_IDS, first_number=2):
+def finish_groups(ids=FINISH_IDS, first_number=2, include_blur=True):
     """Layout groups for add_finish(), numbered from first_number."""
     i, n = ids, first_number
-    return [
-        {"title": f"{n} · Portrait mode (optional)", "color": "#a1309b",
-         "columns": [[i["bg_model"], i["mask"]], [i["depth_model"], i["depth"], i["depth_map"]], [i["blur"]]]},
-        {"title": f"{n + 1} · Grade + lens", "color": "#b06634", "columns": [[i["lut"]], [i["lens"]]]},
-        {"title": f"{n + 2} · Sharpen + grain", "color": "#88aa88", "columns": [[i["sharpen"]], [i["grain"]]]},
-        {"title": f"{n + 3} · Export", "color": "#3f789e", "columns": [[i["save"]]]},
+    groups = []
+    if include_blur:
+        groups.append({"title": f"{n} · Portrait mode (optional)", "color": "#a1309b",
+                       "columns": [[i["bg_model"], i["mask"]], [i["depth_model"], i["depth"], i["depth_map"]],
+                                   [i["blur"]]]})
+        n += 1
+    return groups + [
+        {"title": f"{n} · Grade + lens", "color": "#b06634", "columns": [[i["lut"]], [i["lens"]]]},
+        {"title": f"{n + 1} · Sharpen + grain", "color": "#88aa88", "columns": [[i["sharpen"]], [i["grain"]]]},
+        {"title": f"{n + 2} · Export", "color": "#3f789e", "columns": [[i["save"]]]},
     ]
 
 

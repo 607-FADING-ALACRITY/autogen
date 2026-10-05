@@ -4,6 +4,9 @@ Nodes (category "PostFX"):
   PostFX · Portrait Blur   depth/mask-driven lens blur with halo-free edges and highlight bloom
   PostFX · Apply LUT       .cube 3D/1D LUTs with a strength slider
   PostFX · Lens            lateral chromatic aberration + vignetting
+  PostFX · Detail Transfer fine texture from a refine pass, everything else from the original
+  PostFX · Face Feature Mask / Face Crop / Face Paste
+                           face tools on ComfyUI's native MediaPipe face landmarks
   PostFX · Sharpen         luminance unsharp mask with a noise threshold
   PostFX · Film Grain      luminance-weighted, sized, optionally colored grain
   PostFX · Save JPEG       quality/subsampling control, sRGB profile, no workflow/prompt metadata,
@@ -412,6 +415,274 @@ class PostFXLens:
 
 
 # ---------------------------------------------------------------------------------------------
+# Detail transfer (frequency separation)
+# ---------------------------------------------------------------------------------------------
+def highpass(x_bchw, radius):
+    return x_bchw - gaussian_blur(x_bchw, radius)
+
+
+def detail_transfer(base, detail, radius, strength, protect=None):
+    """Keeps everything coarser than `radius` from base (shapes, features, color, lighting) and takes
+    the finer band (pores, fine texture) from detail. protect: (B, H, W) in [0, 1], 1 = keep base."""
+    b, h, w, _ = base.shape
+    detail = detail.to(base.device, base.dtype)
+    if detail.shape[1:3] != (h, w):
+        detail = F.interpolate(detail.permute(0, 3, 1, 2), size=(h, w), mode="bicubic",
+                               align_corners=False, antialias=True).permute(0, 2, 3, 1)
+    if detail.shape[0] != b:
+        detail = detail[torch.arange(b) % detail.shape[0]]
+    base_c, detail_c = base.permute(0, 3, 1, 2), detail.permute(0, 3, 1, 2)
+    delta = highpass(detail_c, radius) - highpass(base_c, radius)                 # (B, 3, H, W)
+    weight = torch.full((b, 1, h, w), float(strength), device=base.device, dtype=base.dtype)
+    if protect is not None:
+        p = protect.to(base.device, base.dtype)
+        if p.shape[0] != b:
+            p = p[torch.arange(b) % p.shape[0]]
+        if p.shape[1:] != (h, w):
+            p = F.interpolate(p[:, None], size=(h, w), mode="bilinear", align_corners=False)[:, 0]
+        weight = weight * (1.0 - p.clamp(0.0, 1.0))[:, None]
+    return (base_c + delta * weight).clamp(0.0, 1.0).permute(0, 2, 3, 1)
+
+
+class PostFXDetailTransfer:
+    """Adds a refined image's fine texture to the original without changing anything else.
+    Use after a low-denoise refine pass: her face shape, eyes, makeup, colors and lighting stay
+    exactly as in `base`; only detail finer than `radius` comes from `detail`."""
+
+    CATEGORY = "PostFX"
+    RETURN_TYPES = ("IMAGE",)
+    FUNCTION = "apply"
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "base": ("IMAGE", {"tooltip": "The image whose look you want to keep."}),
+                "detail": ("IMAGE", {"tooltip": "The refined image to take fine texture from."}),
+                "radius": ("FLOAT", {"default": 3.0, "min": 0.5, "max": 12.0, "step": 0.25,
+                                     "tooltip": "Detail finer than this (pixels) comes from `detail`. "
+                                                "1.5–2 = pores only; 3–4 = pores + fine skin structure; "
+                                                "6+ starts moving shading and makeup too."}),
+                "strength": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 2.0, "step": 0.05}),
+            },
+            "optional": {
+                "protect_mask": ("MASK", {"tooltip": "1 = keep base untouched (eyes, brows, lips). "
+                                                     "From PostFX · Face Feature Mask."}),
+            },
+        }
+
+    def apply(self, base, detail, radius, strength, protect_mask=None):
+        if strength <= 0:
+            return (base,)
+        rgb, extra = _split_alpha(base)
+        return (_join_alpha(detail_transfer(rgb, detail[..., :3], radius, strength, protect_mask), extra),)
+
+
+# ---------------------------------------------------------------------------------------------
+# Face tools: built on ComfyUI's native "Detect Face Landmarks (MediaPipe)" output
+# ---------------------------------------------------------------------------------------------
+def _frames(face_landmarks):
+    if not isinstance(face_landmarks, dict) or "frames" not in face_landmarks:
+        raise ValueError("expected FACE_LANDMARKS from the 'Detect Face Landmarks (MediaPipe)' node")
+    return face_landmarks["frames"]
+
+
+def _region_points(face_landmarks, landmarks_xy, *names):
+    sets = face_landmarks["connection_sets"]
+    idx = sorted({i for name in names for edge in sets[name] for i in edge})
+    return np.asarray(landmarks_xy, dtype=np.float32)[idx]
+
+
+def convex_hull(points):
+    """Monotone-chain convex hull of (N, 2) points -> list of (x, y)."""
+    pts = sorted(set(map(tuple, np.asarray(points, dtype=np.float64).tolist())))
+    if len(pts) <= 2:
+        return pts
+
+    def cross(o, a, b):
+        return (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0])
+
+    lower, upper = [], []
+    for p in pts:
+        while len(lower) >= 2 and cross(lower[-2], lower[-1], p) <= 0:
+            lower.pop()
+        lower.append(p)
+    for p in reversed(pts):
+        while len(upper) >= 2 and cross(upper[-2], upper[-1], p) <= 0:
+            upper.pop()
+        upper.append(p)
+    return lower[:-1] + upper[:-1]
+
+
+def _fill_polygons(polygons, height, width, offset=(0.0, 0.0)):
+    from PIL import ImageDraw
+    canvas = Image.new("L", (width, height), 0)
+    draw = ImageDraw.Draw(canvas)
+    for poly in polygons:
+        if len(poly) >= 3:
+            draw.polygon([(float(x) - offset[0], float(y) - offset[1]) for x, y in poly], fill=255)
+    return torch.from_numpy(np.asarray(canvas, dtype=np.float32) / 255.0)
+
+
+def _grow_and_feather(mask, grow_px, feather_px):
+    if grow_px >= 1:
+        k = 2 * int(round(grow_px)) + 1
+        mask = F.max_pool2d(mask[None, None], k, stride=1, padding=k // 2)[0, 0]
+    if feather_px > 0:
+        mask = gaussian_blur(mask[None, None], feather_px)[0, 0]
+    return mask.clamp(0.0, 1.0)
+
+
+def _eye_distance(face_landmarks, landmarks_xy):
+    left = _region_points(face_landmarks, landmarks_xy, "left_eye").mean(axis=0)
+    right = _region_points(face_landmarks, landmarks_xy, "right_eye").mean(axis=0)
+    return float(np.hypot(*(left - right)))
+
+
+class PostFXFaceFeatureMask:
+    """Mask of the features that make her look like her (eyes with lashes, brows, lips), for
+    protecting them from refine passes. Every detected face is included."""
+
+    CATEGORY = "PostFX"
+    RETURN_TYPES = ("MASK",)
+    FUNCTION = "apply"
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "face_landmarks": ("FACE_LANDMARKS",),
+                "eyes_and_brows": ("BOOLEAN", {"default": True, "tooltip": "Eyes, lashes, lids and brows."}),
+                "lips": ("BOOLEAN", {"default": True}),
+                "grow": ("FLOAT", {"default": 0.12, "min": 0.0, "max": 0.5, "step": 0.01,
+                                   "tooltip": "Margin around each feature, as a fraction of the distance "
+                                              "between the eyes. 0.12 covers lashes and liner."}),
+                "feather": ("FLOAT", {"default": 4.0, "min": 0.0, "max": 32.0, "step": 0.5,
+                                      "tooltip": "Edge softness in pixels."}),
+            }
+        }
+
+    def apply(self, face_landmarks, eyes_and_brows, lips, grow, feather):
+        frames = _frames(face_landmarks)
+        height, width = face_landmarks["image_size"]
+        masks = []
+        for faces in frames:
+            mask = torch.zeros(height, width)
+            for face in faces:
+                xy = face["landmarks_xy"]
+                groups = []
+                if eyes_and_brows:
+                    groups += [("left_eye", "left_eyebrow"), ("right_eye", "right_eyebrow")]
+                if lips:
+                    groups += [("lips",)]
+                polygons = [convex_hull(_region_points(face_landmarks, xy, *g)) for g in groups]
+                region = _fill_polygons(polygons, height, width)
+                region = _grow_and_feather(region, grow * _eye_distance(face_landmarks, xy), feather)
+                mask = torch.maximum(mask, region)
+            masks.append(mask)
+        if not masks:
+            masks = [torch.zeros(height, width)]
+        return (torch.stack(masks),)
+
+
+class PostFXFaceCrop:
+    """Crops the largest face to a square of `size` px for a detail pass. The crop box always stays
+    inside the image (no padding). Pair with PostFX · Face Paste."""
+
+    CATEGORY = "PostFX"
+    RETURN_TYPES = ("IMAGE", "FACE_CROP")
+    RETURN_NAMES = ("face", "face_crop")
+    FUNCTION = "apply"
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "image": ("IMAGE",),
+                "face_landmarks": ("FACE_LANDMARKS", {"tooltip": "Landmarks detected on this same image."}),
+                "context": ("FLOAT", {"default": 1.6, "min": 1.0, "max": 4.0, "step": 0.05,
+                                      "tooltip": "Crop side as a multiple of the face size."}),
+                "size": ("INT", {"default": 1024, "min": 256, "max": 2048, "step": 64}),
+                "paste_grow": ("FLOAT", {"default": 0.06, "min": 0.0, "max": 0.5, "step": 0.01,
+                                         "tooltip": "How far past the face outline the result is pasted, "
+                                                    "as a fraction of face size."}),
+            }
+        }
+
+    def apply(self, image, face_landmarks, context, size, paste_grow):
+        frames = _frames(face_landmarks)
+        lm_h, lm_w = face_landmarks["image_size"]
+        batch, height, width, _ = image.shape
+        sx, sy = width / lm_w, height / lm_h                                   # landmarks -> image pixels
+        crops, infos = [], []
+        for i in range(batch):
+            faces = frames[min(i, len(frames) - 1)] if frames else []
+            if not faces:
+                crops.append(torch.zeros(size, size, 3, dtype=image.dtype, device=image.device))
+                infos.append({"found": False})
+                continue
+            ovals = [convex_hull(_region_points(face_landmarks, f["landmarks_xy"], "face_oval") * [sx, sy])
+                     for f in faces]
+            areas = [abs(sum(x0 * y1 - x1 * y0 for (x0, y0), (x1, y1) in zip(o, o[1:] + o[:1]))) for o in ovals]
+            oval = np.asarray(ovals[int(np.argmax(areas))])
+            x0, y0 = oval.min(axis=0)
+            x1, y1 = oval.max(axis=0)
+            face_size = max(x1 - x0, y1 - y0)
+            side = int(round(min(face_size * context, height, width)))
+            cx, cy = (x0 + x1) / 2.0, (y0 + y1) / 2.0
+            left = int(round(min(max(cx - side / 2.0, 0), width - side)))
+            top = int(round(min(max(cy - side / 2.0, 0), height - side)))
+            region = image[i, top:top + side, left:left + side, :3].permute(2, 0, 1)[None]
+            crop = F.interpolate(region, size=(size, size), mode="bicubic", align_corners=False,
+                                 antialias=True)[0].permute(1, 2, 0).clamp(0.0, 1.0)
+            paste = _fill_polygons([oval.tolist()], side, side, offset=(left, top))
+            paste = _grow_and_feather(paste, paste_grow * face_size, max(2.0, 0.04 * face_size))
+            crops.append(crop)
+            infos.append({"found": True, "left": left, "top": top, "side": side, "mask": paste})
+        return (torch.stack(crops), infos)
+
+
+class PostFXFacePaste:
+    """Pastes a processed face crop back. If no face was found, returns the image unchanged and the
+    face pass connected to `face` is never run."""
+
+    CATEGORY = "PostFX"
+    RETURN_TYPES = ("IMAGE",)
+    FUNCTION = "apply"
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "image": ("IMAGE",),
+                "face_crop": ("FACE_CROP",),
+                "face": ("IMAGE", {"lazy": True, "tooltip": "The processed face from the detail pass."}),
+            }
+        }
+
+    def check_lazy_status(self, image, face_crop, face=None):
+        if face is None and any(info.get("found") for info in face_crop):
+            return ["face"]
+        return []
+
+    def apply(self, image, face_crop, face=None):
+        if face is None or not any(info.get("found") for info in face_crop):
+            return (image,)
+        out = image.clone()
+        for i, info in enumerate(face_crop):
+            if not info.get("found") or i >= out.shape[0]:
+                continue
+            side, top, left = info["side"], info["top"], info["left"]
+            src = face[min(i, face.shape[0] - 1), ..., :3].permute(2, 0, 1)[None].to(out.device, out.dtype)
+            src = F.interpolate(src, size=(side, side), mode="bicubic", align_corners=False,
+                                antialias=True)[0].permute(1, 2, 0).clamp(0.0, 1.0)
+            mask = info["mask"].to(out.device, out.dtype)[..., None]
+            region = out[i, top:top + side, left:left + side, :3]
+            out[i, top:top + side, left:left + side, :3] = region * (1.0 - mask) + src * mask
+        return (out,)
+
+
+# ---------------------------------------------------------------------------------------------
 # Sharpen
 # ---------------------------------------------------------------------------------------------
 class PostFXSharpen:
@@ -604,6 +875,10 @@ NODE_CLASS_MAPPINGS = {
     "PostFXPortraitBlur": PostFXPortraitBlur,
     "PostFXApplyLUT": PostFXApplyLUT,
     "PostFXLens": PostFXLens,
+    "PostFXDetailTransfer": PostFXDetailTransfer,
+    "PostFXFaceFeatureMask": PostFXFaceFeatureMask,
+    "PostFXFaceCrop": PostFXFaceCrop,
+    "PostFXFacePaste": PostFXFacePaste,
     "PostFXSharpen": PostFXSharpen,
     "PostFXFilmGrain": PostFXFilmGrain,
     "PostFXSaveJPEG": PostFXSaveJPEG,
@@ -613,6 +888,10 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "PostFXPortraitBlur": "PostFX · Portrait Blur",
     "PostFXApplyLUT": "PostFX · Apply LUT",
     "PostFXLens": "PostFX · Lens",
+    "PostFXDetailTransfer": "PostFX · Detail Transfer",
+    "PostFXFaceFeatureMask": "PostFX · Face Feature Mask",
+    "PostFXFaceCrop": "PostFX · Face Crop",
+    "PostFXFacePaste": "PostFX · Face Paste",
     "PostFXSharpen": "PostFX · Sharpen",
     "PostFXFilmGrain": "PostFX · Film Grain",
     "PostFXSaveJPEG": "PostFX · Save JPEG",

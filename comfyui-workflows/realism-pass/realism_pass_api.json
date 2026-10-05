@@ -11,11 +11,11 @@
   "2": {
     "class_type": "UNETLoader",
     "inputs": {
-      "unet_name": "finepornV5INT8FP8_v5FP8.safetensors",
+      "unet_name": "realismByStableYogi_v30_fp8_scaled.safetensors",
       "weight_dtype": "default"
     },
     "_meta": {
-      "title": "FinePorn v5 (Krea 2)"
+      "title": "Refiner (Realism by Stable Yogi)"
     }
   },
   "3": {
@@ -30,20 +30,6 @@
     },
     "_meta": {
       "title": "Character LoRA"
-    }
-  },
-  "4": {
-    "class_type": "LoraLoaderModelOnly",
-    "inputs": {
-      "model": [
-        "3",
-        0
-      ],
-      "lora_name": "skin_detail_lora.safetensors",
-      "strength_model": 0.3
-    },
-    "_meta": {
-      "title": "Skin detail LoRA (texture pass only)"
     }
   },
   "5": {
@@ -66,6 +52,15 @@
       "title": "VAE"
     }
   },
+  "7": {
+    "class_type": "LoadMediaPipeFaceLandmarker",
+    "inputs": {
+      "model_name": "mediapipe_face_fp32.safetensors"
+    },
+    "_meta": {
+      "title": "Face landmark model"
+    }
+  },
   "10": {
     "class_type": "ImageScaleToTotalPixels",
     "inputs": {
@@ -84,7 +79,7 @@
   "11": {
     "class_type": "CLIPTextEncode",
     "inputs": {
-      "text": "this is an amateur photo taken from smartphone, casual photo. A 25-year-old woman with natural skin texture: fine visible pores, subtle uneven skin tone, slight redness on knees, elbows and knuckles, matte skin without glossy highlights, natural light with real shadows.",
+      "text": "amateur smartphone photo of a 25-year-old woman. Natural skin texture: fine visible pores, subtle uneven skin tone, faint redness on knees, elbows and knuckles, matte skin without glossy highlights.",
       "clip": [
         "5",
         0
@@ -126,7 +121,7 @@
     "class_type": "KSampler",
     "inputs": {
       "model": [
-        "4",
+        "3",
         0
       ],
       "seed": 0,
@@ -168,11 +163,69 @@
       "title": "Decode"
     }
   },
+  "17": {
+    "class_type": "MediaPipeFaceLandmarker",
+    "inputs": {
+      "face_detection_model": [
+        "7",
+        0
+      ],
+      "image": [
+        "10",
+        0
+      ],
+      "detector_variant": "both",
+      "num_faces": 0,
+      "min_confidence": 0.65,
+      "missing_frame_fallback": "empty"
+    },
+    "_meta": {
+      "title": "Find faces"
+    }
+  },
+  "18": {
+    "class_type": "PostFXFaceFeatureMask",
+    "inputs": {
+      "face_landmarks": [
+        "17",
+        0
+      ],
+      "eyes_and_brows": true,
+      "lips": true,
+      "grow": 0.12,
+      "feather": 4.0
+    },
+    "_meta": {
+      "title": "Protect eyes, lashes, brows, lips"
+    }
+  },
+  "19": {
+    "class_type": "PostFXDetailTransfer",
+    "inputs": {
+      "base": [
+        "10",
+        0
+      ],
+      "detail": [
+        "15",
+        0
+      ],
+      "radius": 3.0,
+      "strength": 1.0,
+      "protect_mask": [
+        "18",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "Keep her look, take only fine texture"
+    }
+  },
   "16": {
     "class_type": "PreviewImage",
     "inputs": {
       "images": [
-        "15",
+        "19",
         0
       ]
     },
@@ -181,107 +234,28 @@
     }
   },
   "20": {
-    "class_type": "UltralyticsDetectorProvider",
-    "inputs": {
-      "model_name": "bbox/face_yolov8m.pt"
-    },
-    "_meta": {
-      "title": "Face detector"
-    }
-  },
-  "21": {
-    "class_type": "BboxDetectorSEGS",
-    "inputs": {
-      "bbox_detector": [
-        "20",
-        0
-      ],
-      "image": [
-        "15",
-        0
-      ],
-      "threshold": 0.5,
-      "dilation": 0,
-      "crop_factor": 3.0,
-      "drop_size": 10,
-      "labels": "all"
-    },
-    "_meta": {
-      "title": "Detect faces"
-    }
-  },
-  "22": {
-    "class_type": "ImpactSEGSOrderedFilter",
-    "inputs": {
-      "segs": [
-        "21",
-        0
-      ],
-      "target": "area(=w*h)",
-      "order": true,
-      "take_start": 0,
-      "take_count": 1
-    },
-    "_meta": {
-      "title": "Keep largest face"
-    }
-  },
-  "23": {
-    "class_type": "SegsToCombinedMask",
-    "inputs": {
-      "segs": [
-        "22",
-        0
-      ]
-    },
-    "_meta": {
-      "title": "Face mask"
-    }
-  },
-  "24": {
-    "class_type": "InpaintCropImproved",
+    "class_type": "PostFXFaceCrop",
     "inputs": {
       "image": [
-        "15",
+        "19",
         0
       ],
-      "mask": [
-        "23",
+      "face_landmarks": [
+        "17",
         0
       ],
-      "downscale_algorithm": "bilinear",
-      "upscale_algorithm": "bicubic",
-      "preresize": false,
-      "preresize_mode": "ensure minimum resolution",
-      "preresize_min_width": 1024,
-      "preresize_min_height": 1024,
-      "preresize_max_width": 16384,
-      "preresize_max_height": 16384,
-      "mask_fill_holes": true,
-      "mask_expand_pixels": 24,
-      "mask_invert": false,
-      "mask_blend_pixels": 32,
-      "mask_hipass_filter": 0.1,
-      "extend_for_outpainting": false,
-      "extend_up_factor": 1.0,
-      "extend_down_factor": 1.0,
-      "extend_left_factor": 1.0,
-      "extend_right_factor": 1.0,
-      "context_from_mask_extend_factor": 1.3,
-      "output_resize_to_target_size": true,
-      "output_target_width": 1024,
-      "output_target_height": 1024,
-      "output_padding": "32",
-      "device_mode": "gpu (much faster)"
+      "context": 1.6,
+      "size": 1024,
+      "paste_grow": 0.06
     },
     "_meta": {
       "title": "Crop face to 1024px"
     }
   },
-  "25": {
+  "21": {
     "class_type": "CLIPTextEncode",
     "inputs": {
-      "text": "close-up smartphone photo of a 25-year-old woman's face, natural matte skin with fine pores, light everyday makeup, natural eyelashes, faint under-eye shadows, slight redness around the nose, relaxed natural expression, natural light.",
+      "text": "close-up smartphone photo of a 25-year-old woman's face. Natural skin texture with fine visible pores, subtle uneven skin tone, matte skin.",
       "clip": [
         "5",
         0
@@ -291,11 +265,11 @@
       "title": "Face prompt (set her real age)"
     }
   },
-  "26": {
+  "22": {
     "class_type": "ConditioningZeroOut",
     "inputs": {
       "conditioning": [
-        "25",
+        "21",
         0
       ]
     },
@@ -303,12 +277,12 @@
       "title": "Negative (ignored at CFG 1)"
     }
   },
-  "27": {
+  "23": {
     "class_type": "VAEEncode",
     "inputs": {
       "pixels": [
-        "24",
-        1
+        "20",
+        0
       ],
       "vae": [
         "6",
@@ -319,23 +293,7 @@
       "title": "Encode face"
     }
   },
-  "28": {
-    "class_type": "SetLatentNoiseMask",
-    "inputs": {
-      "samples": [
-        "27",
-        0
-      ],
-      "mask": [
-        "24",
-        2
-      ]
-    },
-    "_meta": {
-      "title": "Only touch the face"
-    }
-  },
-  "29": {
+  "24": {
     "class_type": "KSampler",
     "inputs": {
       "model": [
@@ -348,15 +306,15 @@
       "sampler_name": "euler",
       "scheduler": "simple",
       "positive": [
-        "25",
+        "21",
         0
       ],
       "negative": [
-        "26",
+        "22",
         0
       ],
       "latent_image": [
-        "28",
+        "23",
         0
       ],
       "denoise": 0.3
@@ -365,11 +323,11 @@
       "title": "Face pass (denoise 0.30)"
     }
   },
-  "30": {
+  "25": {
     "class_type": "VAEDecode",
     "inputs": {
       "samples": [
-        "29",
+        "24",
         0
       ],
       "vae": [
@@ -381,15 +339,19 @@
       "title": "Decode face"
     }
   },
-  "31": {
-    "class_type": "InpaintStitchImproved",
+  "26": {
+    "class_type": "PostFXFacePaste",
     "inputs": {
-      "stitcher": [
-        "24",
+      "image": [
+        "19",
         0
       ],
-      "inpainted_image": [
-        "30",
+      "face_crop": [
+        "20",
+        1
+      ],
+      "face": [
+        "25",
         0
       ]
     },
@@ -397,141 +359,37 @@
       "title": "Paste face back"
     }
   },
-  "33": {
-    "class_type": "ImpactIsNotEmptySEGS",
+  "27": {
+    "class_type": "PostFXDetailTransfer",
     "inputs": {
-      "segs": [
-        "22",
+      "base": [
+        "19",
+        0
+      ],
+      "detail": [
+        "26",
+        0
+      ],
+      "radius": 3.0,
+      "strength": 1.0,
+      "protect_mask": [
+        "18",
         0
       ]
     },
     "_meta": {
-      "title": "Face found?"
-    }
-  },
-  "34": {
-    "class_type": "ImpactConditionalBranch",
-    "inputs": {
-      "cond": [
-        "33",
-        0
-      ],
-      "tt_value": [
-        "31",
-        0
-      ],
-      "ff_value": [
-        "15",
-        0
-      ]
-    },
-    "_meta": {
-      "title": "Face pass only if a face was found"
-    }
-  },
-  "40": {
-    "class_type": "LoadBackgroundRemovalModel",
-    "inputs": {
-      "bg_removal_name": "birefnet.safetensors"
-    },
-    "_meta": {
-      "title": "Subject model (BiRefNet)"
-    }
-  },
-  "41": {
-    "class_type": "RemoveBackground",
-    "inputs": {
-      "bg_removal_model": [
-        "40",
-        0
-      ],
-      "image": [
-        "34",
-        0
-      ]
-    },
-    "_meta": {
-      "title": "Subject mask"
-    }
-  },
-  "42": {
-    "class_type": "LoadDA3Model",
-    "inputs": {
-      "model_name": "depth_anything_3_mono_large.safetensors",
-      "weight_dtype": "default"
-    },
-    "_meta": {
-      "title": "Depth model (Depth Anything 3)"
-    }
-  },
-  "43": {
-    "class_type": "DA3Inference",
-    "inputs": {
-      "da3_model": [
-        "42",
-        0
-      ],
-      "image": [
-        "34",
-        0
-      ],
-      "resolution": 504,
-      "resize_method": "upper_bound_resize",
-      "mode": "mono"
-    },
-    "_meta": {
-      "title": "Estimate depth"
-    }
-  },
-  "44": {
-    "class_type": "DA3Render",
-    "inputs": {
-      "da3_geometry": [
-        "43",
-        0
-      ],
-      "output": "depth",
-      "output.normalization": "v2_style",
-      "output.apply_sky_clip": false
-    },
-    "_meta": {
-      "title": "Depth map (near = white)"
-    }
-  },
-  "45": {
-    "class_type": "PostFXPortraitBlur",
-    "inputs": {
-      "image": [
-        "34",
-        0
-      ],
-      "enabled": false,
-      "blur_strength": 1.5,
-      "falloff": 0.3,
-      "highlight_bloom": 0.35,
-      "edge_softness": 1.5,
-      "subject_mask": [
-        "41",
-        0
-      ],
-      "depth": [
-        "44",
-        0
-      ]
-    },
-    "_meta": {
-      "title": "Portrait blur"
+      "title": "Keep her face, take only fine texture"
     }
   },
   "50": {
     "class_type": "PostFXApplyLUT",
     "inputs": {
       "image": [
-        "45",
+        "27",
         0
       ],
       "lut_name": "warm_film.cube",
-      "strength": 0.5
+      "strength": 0.0
     },
     "_meta": {
       "title": "LUT grade"
@@ -573,7 +431,7 @@
         "52",
         0
       ],
-      "amount": 0.35,
+      "amount": 0.3,
       "size": 1.5,
       "color": 0.15,
       "seed": 0

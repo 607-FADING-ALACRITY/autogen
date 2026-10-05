@@ -112,6 +112,16 @@ Gaussian grain, clumped to `size` pixels.
 | 0.3 | Phone camera (default) |
 | 0.5+ | Film |
 
+### Face and detail tools
+
+These are used by `../realism-pass`; they're not part of this workflow.
+
+| Node | What it does |
+|---|---|
+| **PostFX · Detail Transfer** | Frequency separation. Keeps everything coarser than `radius` from `base` and takes only finer detail from `detail`. `protect_mask` = 1 keeps `base` untouched. |
+| **PostFX · Face Feature Mask** | Mask of eyes with lashes and brows, plus lips, from the native *Detect Face Landmarks (MediaPipe)* node. |
+| **PostFX · Face Crop / Face Paste** | Crops the largest face to a square for a detail pass and pastes it back with a feathered face-outline mask. The crop box never leaves the image. When no face is found, Face Paste never requests the face pass, so it doesn't run. |
+
 ### PostFX · Save JPEG
 
 | Setting | Default | Notes |
@@ -153,9 +163,11 @@ Everything here runs on CPU, so unlike the face-swap stages this pipeline was **
 - **Visual check:** the subject stays sharp, the background blur grades with depth, there's no halo, and the sky keeps its color.
 - **JPEG check:** the file carries the AI tag and ICC profile, has no EXIF, and contains no workflow or prompt text.
 - **Timing:** about 50 s per image on a 4-core CPU with the blur on, almost all of it BiRefNet and Depth Anything. With the blur off it takes 0.5 s, confirming both models are skipped. A GPU is far faster; it wasn't measured here.
-- **Unit tests:** `tools/test_postfx.py` has 23 tests covering:
+- **Unit tests:** `tools/test_postfx.py` has 28 tests covering:
   - identity, channel order, 1D and domain handling for LUTs
   - lens: identity at zero, vignette falloff, fringe direction and growth toward corners
+  - detail transfer: coarse changes rejected, fine texture transferred, protect mask exact
+  - face tools: feature mask coverage, crop bounds, paste round trip, no-face skip
   - sharpen threshold behavior
   - grain calibration and determinism
   - blur: subject preservation, no halo, depth-driven focus, bloom that spares sky and skyline, lazy skipping

@@ -9,6 +9,7 @@ import os
 import sys
 from pathlib import Path
 
+import numpy as np
 import pytest
 import torch
 from PIL import Image
@@ -113,6 +114,91 @@ def test_chromatic_aberration_fringes_grow_toward_corners():
     red_cols = corner[..., 0].sum(0).nonzero().flatten()
     blue_cols = corner[..., 2].sum(0).nonzero().flatten()
     assert int(red_cols.min()) < int(blue_cols.min())
+
+
+# ---- Detail transfer ---------------------------------------------------------------------------
+def test_detail_transfer_keeps_coarse_takes_fine():
+    torch.manual_seed(0)
+    base = gradient_image(96, 96)
+    noise = torch.randn(1, 96, 96, 3) * 0.05
+    node = postfx.PostFXDetailTransfer()
+    (same,) = node.apply(base, base.clone(), 3.0, 1.0)
+    assert torch.allclose(same, base, atol=1e-6)
+    (shifted,) = node.apply(base, (base + 0.2).clamp(0, 1), 3.0, 1.0)      # brighter overall = coarse change
+    assert float((shifted - base)[:, 8:-8, 8:-8].abs().max()) < 0.02
+    (textured,) = node.apply(base, base + noise, 3.0, 1.0)                  # fine texture = transferred
+    expected = postfx.highpass(noise.permute(0, 3, 1, 2), 3.0).permute(0, 2, 3, 1)
+    got = textured - base
+    corr = float((got * expected).sum() / (got.norm() * expected.norm()))
+    assert corr > 0.95
+
+
+def test_detail_transfer_protect_mask_keeps_base_exactly():
+    torch.manual_seed(0)
+    base = gradient_image(64, 64)
+    detail = (base + torch.randn(1, 64, 64, 3) * 0.05).clamp(0, 1)
+    protect = torch.zeros(1, 64, 64)
+    protect[:, :, :32] = 1.0
+    (out,) = postfx.PostFXDetailTransfer().apply(base, detail, 2.0, 1.0, protect_mask=protect)
+    assert torch.equal(out[:, :, :32], base[:, :, :32])
+    assert not torch.allclose(out[:, :, 40:], base[:, :, 40:])
+
+
+# ---- Face tools (synthetic landmarks with the same structure as MediaPipe's) ---------------------
+def ring(cx, cy, rx, ry, n, start):
+    t = torch.linspace(0, 2 * torch.pi, n + 1)[:-1]
+    pts = torch.stack([cx + rx * torch.cos(t), cy + ry * torch.sin(t)], dim=-1).numpy()
+    return pts, [(start + k, start + (k + 1) % n) for k in range(n)]
+
+
+def fake_landmarks(height=200, width=200, cx=100, cy=100, scale=1.0, faces=1):
+    parts = {"face_oval": (0, 0, 60, 75, 36), "left_eye": (-25, -15, 12, 5, 16), "right_eye": (25, -15, 12, 5, 16),
+             "left_eyebrow": (-25, -30, 14, 3, 8), "right_eyebrow": (25, -30, 14, 3, 8), "lips": (0, 35, 18, 7, 20)}
+    pts, sets, start = [], {}, 0
+    for name, (dx, dy, rx, ry, n) in parts.items():
+        p, edges = ring(cx + dx * scale, cy + dy * scale, rx * scale, ry * scale, n, start)
+        pts.append(p); sets[name] = frozenset(edges); start += n
+    xy = np.concatenate(pts).astype(np.float32)
+    return {"frames": [[{"landmarks_xy": xy} for _ in range(faces)]], "image_size": (height, width),
+            "connection_sets": sets}
+
+
+
+def test_feature_mask_covers_eyes_brows_lips_not_cheeks():
+    (mask,) = postfx.PostFXFaceFeatureMask().apply(fake_landmarks(), True, True, 0.12, 0.0)
+    assert mask.shape == (1, 200, 200)
+    for x, y in ((75, 85), (125, 85), (75, 70), (100, 135)):              # eye, eye, brow, lips
+        assert float(mask[0, y, x]) == 1.0
+    assert float(mask[0, 110, 60]) == 0.0                                   # cheek stays editable
+    (none,) = postfx.PostFXFaceFeatureMask().apply(fake_landmarks(faces=0), True, True, 0.12, 4.0)
+    assert float(none.max()) == 0.0
+
+
+def test_face_crop_paste_roundtrip_and_bounds():
+    torch.manual_seed(0)
+    img = torch.rand(1, 200, 300, 3)
+    lm = fake_landmarks(height=200, width=300, cx=40, cy=60)               # face near the top-left corner
+    crop, info = postfx.PostFXFaceCrop().apply(img, lm, 1.6, 256, 0.06)
+    assert crop.shape == (1, 256, 256, 3)
+    i = info[0]
+    assert i["found"] and i["left"] >= 0 and i["top"] >= 0
+    assert i["left"] + i["side"] <= 300 and i["top"] + i["side"] <= 200    # never pads past the image
+    paste = postfx.PostFXFacePaste()
+    assert paste.check_lazy_status(img, info, None) == ["face"]
+    (out,) = paste.apply(img, info, face=torch.zeros(1, 256, 256, 3))
+    inside = i["mask"] > 0.99
+    y, x = inside.nonzero()[0].tolist()
+    assert float(out[0, i["top"] + y, i["left"] + x].max()) < 0.01        # face area replaced
+    assert torch.equal(out[0, :, 250:], img[0, :, 250:])                  # far from the face untouched
+
+
+def test_face_crop_with_no_face_skips_the_face_pass():
+    img = torch.rand(1, 120, 160, 3)
+    crop, info = postfx.PostFXFaceCrop().apply(img, fake_landmarks(120, 160, faces=0), 1.6, 256, 0.06)
+    paste = postfx.PostFXFacePaste()
+    assert info == [{"found": False}]
+    assert paste.check_lazy_status(img, info, None) == []                 # face pass never requested
+    assert paste.apply(img, info, None)[0] is img
 
 
 # ---- Sharpen -----------------------------------------------------------------------------------
