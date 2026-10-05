@@ -1,0 +1,181 @@
+{
+  "1": {
+    "class_type": "LoadImage",
+    "inputs": {
+      "image": "example.png"
+    },
+    "_meta": {
+      "title": "Input image"
+    }
+  },
+  "10": {
+    "class_type": "LoadBackgroundRemovalModel",
+    "inputs": {
+      "bg_removal_name": "birefnet.safetensors"
+    },
+    "_meta": {
+      "title": "Subject model (BiRefNet)"
+    }
+  },
+  "11": {
+    "class_type": "RemoveBackground",
+    "inputs": {
+      "bg_removal_model": [
+        "10",
+        0
+      ],
+      "image": [
+        "1",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "Subject mask"
+    }
+  },
+  "12": {
+    "class_type": "LoadDA3Model",
+    "inputs": {
+      "model_name": "depth_anything_3_mono_large.safetensors",
+      "weight_dtype": "default"
+    },
+    "_meta": {
+      "title": "Depth model (Depth Anything 3)"
+    }
+  },
+  "13": {
+    "class_type": "DA3Inference",
+    "inputs": {
+      "da3_model": [
+        "12",
+        0
+      ],
+      "image": [
+        "1",
+        0
+      ],
+      "resolution": 504,
+      "resize_method": "upper_bound_resize",
+      "mode": "mono"
+    },
+    "_meta": {
+      "title": "Estimate depth"
+    }
+  },
+  "14": {
+    "class_type": "DA3Render",
+    "inputs": {
+      "da3_geometry": [
+        "13",
+        0
+      ],
+      "output": "depth",
+      "output.normalization": "v2_style",
+      "output.apply_sky_clip": false
+    },
+    "_meta": {
+      "title": "Depth map (near = white)"
+    }
+  },
+  "15": {
+    "class_type": "PostFXPortraitBlur",
+    "inputs": {
+      "image": [
+        "1",
+        0
+      ],
+      "enabled": true,
+      "blur_strength": 1.5,
+      "falloff": 0.3,
+      "highlight_bloom": 0.35,
+      "edge_softness": 1.5,
+      "subject_mask": [
+        "11",
+        0
+      ],
+      "depth": [
+        "14",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "Portrait blur"
+    }
+  },
+  "20": {
+    "class_type": "PostFXApplyLUT",
+    "inputs": {
+      "image": [
+        "15",
+        0
+      ],
+      "lut_name": "warm_film.cube",
+      "strength": 0.75
+    },
+    "_meta": {
+      "title": "LUT grade"
+    }
+  },
+  "21": {
+    "class_type": "PostFXLens",
+    "inputs": {
+      "image": [
+        "20",
+        0
+      ],
+      "chromatic_aberration": 1.0,
+      "vignette": 0.25
+    },
+    "_meta": {
+      "title": "Lens"
+    }
+  },
+  "30": {
+    "class_type": "PostFXSharpen",
+    "inputs": {
+      "image": [
+        "21",
+        0
+      ],
+      "amount": 0.5,
+      "radius": 1.0,
+      "threshold": 0.02
+    },
+    "_meta": {
+      "title": "Sharpen"
+    }
+  },
+  "31": {
+    "class_type": "PostFXFilmGrain",
+    "inputs": {
+      "image": [
+        "30",
+        0
+      ],
+      "amount": 0.3,
+      "size": 1.5,
+      "color": 0.15,
+      "seed": 0
+    },
+    "_meta": {
+      "title": "Grain"
+    }
+  },
+  "40": {
+    "class_type": "PostFXSaveJPEG",
+    "inputs": {
+      "images": [
+        "31",
+        0
+      ],
+      "filename_prefix": "postfx/final",
+      "quality": 92,
+      "chroma_subsampling": "4:4:4 (sharpest color)",
+      "progressive": true,
+      "ai_disclosure": "AI-generated"
+    },
+    "_meta": {
+      "title": "Save JPEG"
+    }
+  }
+}
