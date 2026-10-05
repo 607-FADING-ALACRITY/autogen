@@ -12,6 +12,8 @@
 #      custom nodes with their git commits, every model file with its size, saved workflows.
 #   4. Packs what you can't re-download (your own LoRAs, saved workflows, custom nodes that
 #      aren't git repos) into /workspace/_checkpoint/backup_<date>.tar, to copy off the pod.
+#      On a pod with no volume it also prints browser download links for the tar, served by
+#      ComfyUI's own /view endpoint through the pod's RunPod proxy address.
 #
 # Run in the pod's web terminal:
 #   bash /workspace/runpod-slim/ComfyUI/sm-workflows/comfyui-workflows/tools/pod_checkpoint.sh
@@ -20,12 +22,14 @@
 #   COMFY_DIR=/workspace/runpod-slim/ComfyUI   your ComfyUI folder
 #   OWN_LORAS='dcn_*'                          name pattern of LoRAs you trained yourself
 #   WORKSPACE=/workspace                       the persistent volume's mount point
+#   INCLUDE_OUTPUTS=1                          also pack ComfyUI's output folder (your generations)
 
 set -uo pipefail
 
 WORKSPACE="${WORKSPACE:-/workspace}"
 COMFY_DIR="${COMFY_DIR:-$WORKSPACE/runpod-slim/ComfyUI}"
 OWN_LORAS="${OWN_LORAS:-dcn_*}"
+INCLUDE_OUTPUTS="${INCLUDE_OUTPUTS:-0}"
 OUT_DIR="$WORKSPACE/_checkpoint"
 STAMP="$(date +%Y%m%d_%H%M)"
 RESUME="$OUT_DIR/RESUME.md"
@@ -55,12 +59,20 @@ fi
 
 # --------------------------------------------------------------------------------------------
 step 1/5 "Does $WORKSPACE survive Stop?"
-if mountpoint -q "$WORKSPACE" 2>/dev/null || [ "$(stat -c %d "$WORKSPACE")" != "$(stat -c %d /)" ]; then
-  PERSISTENT=yes
-  ok "$WORKSPACE is its own volume ($(findmnt -n -o SOURCE,FSTYPE,SIZE --target "$WORKSPACE" 2>/dev/null | head -1 | xargs)). Stop keeps it."
+# Resolve symlinks first: on some templates /workspace is a link to the real volume mount.
+WS_MOUNT=$(findmnt -n -o TARGET --target "$WS_REAL" 2>/dev/null | head -1)
+WS_FS=$(findmnt -n -o SOURCE,FSTYPE,SIZE --target "$WS_REAL" 2>/dev/null | head -1 | xargs)
+[ "$WS_REAL" != "$WORKSPACE" ] && echo "   $WORKSPACE is a link to $WS_REAL"
+echo "   $WS_REAL sits on the filesystem mounted at ${WS_MOUNT:-?} (${WS_FS:-unknown})"
+if [ -n "$WS_MOUNT" ]; then
+  [ "$WS_MOUNT" != "/" ] && PERSISTENT=yes || PERSISTENT=no
 else
-  PERSISTENT=no
-  block "$WORKSPACE is on the container disk, not a volume. Stop WIPES it. Copy the backup tar off the pod first."
+  [ "$(stat -L -c %d "$WS_REAL")" != "$(stat -L -c %d /)" ] && PERSISTENT=yes || PERSISTENT=no
+fi
+if [ "$PERSISTENT" = yes ]; then
+  ok "$WORKSPACE is its own volume. Stop keeps it."
+else
+  printf '   STOP  %s\n' "$WORKSPACE is on the container disk, not a volume: this pod has no volume disk, so Stop deletes EVERYTHING on it."
 fi
 if under_workspace "$COMFY_DIR"; then ok "ComfyUI is inside $WORKSPACE: $COMFY_DIR"
 else block "ComfyUI lives outside $WORKSPACE ($COMFY_DIR), on the disk Stop wipes."; fi
@@ -71,6 +83,8 @@ step 2/5 "Looking for anything that lives outside $WORKSPACE"
 # The running ComfyUI: launch command, working dir, Python environment (no pgrep: slim images lack it)
 LAUNCH_LINES=()
 VENV_DIR=""
+PORT=8188
+OUTPUT_DIR="$COMFY_DIR/output"
 for p in /proc/[0-9]*; do
   # Only the Python process itself (argv[0] is python, one argument is main.py), not shells wrapping it
   mapfile -d '' -t argv 2>/dev/null < "$p/cmdline" || continue
@@ -85,6 +99,13 @@ for p in /proc/[0-9]*; do
   venv=$(tr '\0' '\n' < "$p/environ" 2>/dev/null | sed -n 's/^VIRTUAL_ENV=//p')
   py="${argv[0]}"
   LAUNCH_LINES+=("cd $cwd && $cmd")
+  for ((i = 1; i < ${#argv[@]} - 1; i++)); do
+    case "${argv[$i]}" in
+      --port) PORT="${argv[$((i + 1))]}" ;;
+      --output-directory) OUTPUT_DIR="$(cd "$cwd" 2>/dev/null && realpath -m "${argv[$((i + 1))]}")" ;;
+      --base-directory) OUTPUT_DIR="$(cd "$cwd" 2>/dev/null && realpath -m "${argv[$((i + 1))]}")/output" ;;
+    esac
+  done
   [ -n "$venv" ] && VENV_DIR="$venv"
   if [ -z "$VENV_DIR" ]; then case "$py" in */bin/python*) VENV_DIR="$(dirname "$(dirname "$py")")";; esac; fi
 done
@@ -173,10 +194,18 @@ step 3/5 "Writing $RESUME"
   echo
   echo "## Tomorrow"
   echo
-  echo '1. RunPod console → this pod → **Start**. Never **Terminate**: that deletes the volume.'
-  echo '2. The template start script relaunches ComfyUI from the volume. Give it a few minutes, then open port 8188.'
-  echo '3. If ComfyUI does not come up, paste the launch command below into the web terminal.'
-  echo '4. If RunPod says the machine has no free GPU, start it with 0 GPUs to reach your files, or set up a new pod from the backup tar.'
+  if [ "$PERSISTENT" = yes ]; then
+    echo '1. RunPod console → this pod → **Start**. Never **Terminate**: that deletes the volume.'
+    echo "2. The template start script relaunches ComfyUI from the volume. Give it a few minutes, then open port $PORT."
+    echo '3. If ComfyUI does not come up, paste the launch command below into the web terminal.'
+    echo '4. If RunPod says the machine has no free GPU, start it with 0 GPUs to reach your files, or set up a new pod from the backup tar.'
+  else
+    echo 'This pod had no volume disk, so Stop deleted everything on it. Rebuild:'
+    echo
+    echo '1. Create a network volume (Storage → Network Volumes) and deploy the same template on it, so this never happens again.'
+    echo '2. Restore your files from the backup tar (your LoRAs, saved workflows, custom nodes that are not on git).'
+    echo '3. Re-clone the custom nodes and re-download the models listed below.'
+  fi
   echo
   echo "## Launch command (as it was running)"
   echo
@@ -216,7 +245,7 @@ step 3/5 "Writing $RESUME"
   echo
   echo "## Outputs"
   echo
-  echo "$COMFY_DIR/output: $(find "$COMFY_DIR/output" -type f 2>/dev/null | wc -l) files, $(du -sh "$COMFY_DIR/output" 2>/dev/null | cut -f1). They stay on the volume and are not in the backup tar."
+  echo "$OUTPUT_DIR: $(find "$OUTPUT_DIR" -type f 2>/dev/null | wc -l) files, $(du -sh "$OUTPUT_DIR" 2>/dev/null | cut -f1). Not in the backup tar unless you ran with INCLUDE_OUTPUTS=1."
 } > "$RESUME"
 ok "RESUME.md written ($(grep -c '^| [0-9]' "$RESUME") model files listed)"
 
@@ -270,6 +299,44 @@ else
   fi
 fi
 
+OUT_TAR=""
+if [ "$INCLUDE_OUTPUTS" = 1 ] && [ -d "$OUTPUT_DIR" ]; then
+  need=$(du -sb --exclude=_backup "$OUTPUT_DIR" 2>/dev/null | cut -f1)
+  free=$(df -B1 --output=avail "$WORKSPACE" | tail -1 | tr -d ' ')
+  if [ "${need:-0}" -gt "$free" ]; then
+    block "Outputs need $(human "$need") but only $(human "$free") is free; outputs not packed."
+  elif tar -cf "$OUT_DIR/outputs_$STAMP.tar" --exclude=_backup -C "$(dirname "$OUTPUT_DIR")" "$(basename "$OUTPUT_DIR")" 2>"$OUT_DIR/tar_errors.txt"; then
+    OUT_TAR="$OUT_DIR/outputs_$STAMP.tar"
+    ok "wrote $OUT_TAR ($(human "$(stat -c %s "$OUT_TAR")"))"
+    rm -f "$OUT_DIR/tar_errors.txt"
+  else
+    block "outputs tar failed: $(head -3 "$OUT_DIR/tar_errors.txt" | tr '\n' ' ')"
+    rm -f "$OUT_DIR/outputs_$STAMP.tar"
+  fi
+elif [ -d "$OUTPUT_DIR" ]; then
+  echo "   outputs not packed ($(du -sh --exclude=_backup "$OUTPUT_DIR" 2>/dev/null | cut -f1) in $OUTPUT_DIR); rerun with INCLUDE_OUTPUTS=1 to include them"
+fi
+
+# Without a volume, ComfyUI's own /view endpoint is the easiest way to get the tars off the pod:
+# it serves any file in output/ through the same RunPod address you open ComfyUI at.
+LINKS=()
+if [ "$PERSISTENT" = no ]; then
+  mkdir -p "$OUTPUT_DIR/_backup"
+  for t in "$TAR:backup.tar" "$OUT_TAR:outputs.tar"; do
+    src=${t%%:*}; name=${t##*:}
+    [ -n "$src" ] || continue
+    rm -f "$OUTPUT_DIR/_backup/$name"
+    if ln "$src" "$OUTPUT_DIR/_backup/$name" 2>/dev/null || cp "$src" "$OUTPUT_DIR/_backup/$name"; then
+      LINKS+=("$name ($(human "$(stat -c %s "$src")"), $(stat -c %s "$src") bytes): https://${RUNPOD_POD_ID:-YOUR-POD-ID}-$PORT.proxy.runpod.net/view?type=output&subfolder=_backup&filename=$name")
+    else
+      block "Couldn't put $name in $OUTPUT_DIR/_backup for download."
+    fi
+  done
+  echo
+  echo "   Everything on this pod is deleted on Stop. Biggest folders, so you can spot anything else you need:"
+  du -sh "$WS_REAL"/* "$WS_REAL"/runpod-slim/* "$COMFY_DIR"/models/* 2>/dev/null | sort -rh | grep -v '_checkpoint' | head -20 | sed 's/^/     /'
+fi
+
 # --------------------------------------------------------------------------------------------
 step 5/5 "Verdict"
 if [ ${#WARNINGS[@]} -gt 0 ]; then
@@ -277,13 +344,25 @@ if [ ${#WARNINGS[@]} -gt 0 ]; then
   printf '    - %s\n' "${WARNINGS[@]}"
 fi
 echo
-if [ ${#BLOCKERS[@]} -gt 0 ]; then
+if [ "$PERSISTENT" = no ]; then
+  echo "   >>> THIS POD HAS NO VOLUME. Stop (or a restart) deletes everything on it: ComfyUI, models, LoRAs,"
+  echo "       workflows, outputs. Only stop it once the downloads below are saved on your computer."
+  if [ ${#BLOCKERS[@]} -gt 0 ]; then
+    echo "   Also fix these first, then rerun:"
+    printf '    - %s\n' "${BLOCKERS[@]}"
+  fi
+elif [ ${#BLOCKERS[@]} -gt 0 ]; then
   echo "   >>> NOT SAFE TO STOP YET. Fix these first, then rerun:"
   printf '    - %s\n' "${BLOCKERS[@]}"
 else
   echo "   >>> SAFE TO STOP. Use Stop, never Terminate."
 fi
-if [ -n "$TAR" ]; then
+if [ ${#LINKS[@]} -gt 0 ]; then
+  echo
+  echo "   Download these in your browser BEFORE you Stop, and check each file's size matches:"
+  printf '     %s\n' "${LINKS[@]}"
+  echo "   If a link doesn't open, use the address you open ComfyUI at and keep the /view?... part."
+elif [ -n "$TAR" ]; then
   echo
   echo "   Optional insurance: copy the backup off the pod. Run this here, then run the"
   echo "   'runpodctl receive ...' line it prints on your own computer:"
@@ -291,4 +370,4 @@ if [ -n "$TAR" ]; then
 fi
 echo
 echo "   Checkpoint folder: $OUT_DIR"
-[ ${#BLOCKERS[@]} -eq 0 ]
+[ ${#BLOCKERS[@]} -eq 0 ] && [ "$PERSISTENT" = yes ]
